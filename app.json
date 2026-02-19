@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Between Us",
+    "slug": "between-us",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#111827"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.betweenus.app"
+    },
+    "android": {
+      "package": "com.betweenus.app"
+    }
+  }
+}

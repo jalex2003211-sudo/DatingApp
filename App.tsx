@@ -1,9 +1,15 @@
+import '@formatjs/intl-pluralrules/polyfill';
+import '@formatjs/intl-pluralrules/locale-data/en';
+import '@formatjs/intl-pluralrules/locale-data/el';
+
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+
 import './src/i18n';
 import i18n from './src/i18n';
+
 import { usePrefsStore } from './src/state/prefsStore';
 import { ChooseDurationScreen } from './src/screens/ChooseDurationScreen';
 import { ChooseMoodScreen } from './src/screens/ChooseMoodScreen';

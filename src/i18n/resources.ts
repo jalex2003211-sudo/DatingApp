@@ -39,7 +39,12 @@ export const resources = {
       loading: 'Loading...',
       language: 'Language',
       english: 'English',
-      greek: 'Greek'
+      greek: 'Greek',
+      premium: {
+        requiredTitle: 'Premium required',
+        requiredBody: 'This mood is available on Premium. Upgrade to continue.',
+        cta: 'Get Premium'
+      }
     }
   },
   el: {
@@ -82,7 +87,12 @@ export const resources = {
       loading: 'Φόρτωση...',
       language: 'Γλώσσα',
       english: 'Αγγλικά',
-      greek: 'Ελληνικά'
+      greek: 'Ελληνικά',
+      premium: {
+        requiredTitle: 'Απαιτείται Premium',
+        requiredBody: 'Αυτή η διάθεση είναι διαθέσιμη μόνο στο Premium. Κάνε αναβάθμιση για συνέχεια.',
+        cta: 'Απόκτηση Premium'
+      }
     }
   }
 } as const;

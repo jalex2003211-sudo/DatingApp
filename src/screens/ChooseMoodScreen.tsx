@@ -1,21 +1,44 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { AppButton } from '../components/AppButton';
+import { useSessionStore } from '../state/sessionStore';
 import { Mood, RootStackParamList } from '../types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ChooseMood'>;
 
 export const ChooseMoodScreen = ({ navigation }: Props) => {
   const { t } = useTranslation();
+  const isPremium = useSessionStore((state) => state.isPremium);
   const moods: Mood[] = ['FUN', 'DEEP', 'INTIMATE'];
+
+  const showPremiumAlert = () => {
+    Alert.alert(t('premium.requiredTitle'), t('premium.requiredBody'), [{ text: t('premium.cta') }]);
+  };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{t('chooseMoodTitle')}</Text>
-      {moods.map((mood) => (
-        <AppButton key={mood} label={t(`mood.${mood}`)} onPress={() => navigation.navigate('ChooseDuration', { mood })} />
-      ))}
+      {moods.map((mood) => {
+        const isIntimateLocked = mood === 'INTIMATE' && !isPremium;
+        const label = isIntimateLocked ? `🔒 ${t(`mood.${mood}`)} · Premium` : t(`mood.${mood}`);
+
+        return (
+          <AppButton
+            key={mood}
+            label={label}
+            variant={isIntimateLocked ? 'secondary' : 'primary'}
+            onPress={() => {
+              if (isIntimateLocked) {
+                showPremiumAlert();
+                return;
+              }
+
+              navigation.navigate('ChooseDuration', { mood });
+            }}
+          />
+        );
+      })}
     </View>
   );
 };

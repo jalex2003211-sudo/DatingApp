@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { EmotionalJourneySession, JourneySnapshot } from '../application/session/EmotionalJourneySession';
+import { EmotionalJourneySession, JourneySnapshot, StartSessionResult } from '../application/session/EmotionalJourneySession';
 import { DEFAULT_RELATIONSHIP_PROFILE } from '../domain/profile/RelationshipProfile';
 import { SessionSummary } from '../domain/session/types';
 import { getNormalizedQuestionsForMood } from '../engine/normalizeQuestions';
@@ -30,7 +30,8 @@ type SessionState = {
   completed: boolean;
   summary: SessionSummary | null;
   stats: SessionStats;
-  startSession: (mood: Mood, duration: number) => void;
+  lastError: 'PREMIUM_REQUIRED' | 'INVALID_STATE' | null;
+  startSession: (mood: Mood, duration: number) => StartSessionResult;
   nextCard: () => void;
   skipCard: () => void;
   tick: () => void;
@@ -63,7 +64,8 @@ const initialState = {
   paused: false,
   completed: false,
   summary: null,
-  stats: initialStats
+  stats: initialStats,
+  lastError: null
 };
 
 let activeJourneySession: EmotionalJourneySession | null = null;
@@ -99,7 +101,22 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       questions
     });
 
-    const snapshot = activeJourneySession.start();
+    const { result, snapshot } = activeJourneySession.start();
+
+    if (!result.ok) {
+      set({ lastError: result.reason });
+      return result;
+    }
+
+    if (!snapshot) {
+      const invalidStateResult: StartSessionResult = {
+        ok: false,
+        reason: 'INVALID_STATE',
+        message: 'Session could not be started due to an invalid state.'
+      };
+      set({ lastError: invalidStateResult.reason });
+      return invalidStateResult;
+    }
 
     set({
       mood,
@@ -108,8 +125,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       paused: false,
       completed: false,
       summary: null,
+      lastError: null,
       ...patchFromSnapshot(snapshot)
     });
+
+    return result;
   },
   nextCard: () => {
     if (!activeJourneySession) return;

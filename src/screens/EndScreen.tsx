@@ -1,5 +1,5 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { AppButton } from '../components/AppButton';
 import { useSessionStore } from '../state/sessionStore';
@@ -28,8 +28,16 @@ export const EndScreen = ({ navigation }: Props) => {
         label={t('end.playAgain')}
         onPress={() => {
           if (mood) {
-            startSession(mood, duration);
-            navigation.replace('Game');
+            const result = startSession(mood, duration);
+
+            if (!result.ok && result.reason === 'PREMIUM_REQUIRED') {
+              Alert.alert(t('premium.requiredTitle'), t('premium.requiredBody'), [{ text: t('premium.cta') }]);
+              return;
+            }
+
+            if (result.ok) {
+              navigation.replace('Game');
+            }
           }
         }}
       />

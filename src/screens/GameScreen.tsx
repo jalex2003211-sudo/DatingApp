@@ -277,11 +277,11 @@ export const GameScreen = ({ navigation }: Props) => {
         {/* Front card (draggable) */}
         <Animated.View style={[styles.frontCardWrap, cardAnimatedStyle]} {...panResponder.panHandlers}>
           {/* Overlays */}
-          <Animated.View style={[styles.badge, styles.badgeLeft, { opacity: nextOpacity }]}>
+          <Animated.View style={[styles.badge, styles.badgeCenterLeft, { opacity: nextOpacity }]}>
             <Text style={styles.badgeText}>NEXT</Text>
           </Animated.View>
 
-          <Animated.View style={[styles.badge, styles.badgeRight, { opacity: likeOpacity }]}>
+          <Animated.View style={[styles.badge, styles.badgeCenterRight, { opacity: likeOpacity }]}>
             <Text style={styles.badgeText}>LIKE</Text>
           </Animated.View>
 
@@ -343,6 +343,8 @@ const styles = StyleSheet.create({
   },
   frontCardWrap: {
     // sits above back card
+    overflow: 'visible',
+    zIndex: 10,
   },
 
   badge: {
@@ -356,8 +358,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.18)',
   },
   badgeText: { color: '#F9FAFB', fontWeight: '800', letterSpacing: 1 },
-  badgeLeft: { top: 16, left: 16 },
-  badgeRight: { top: 16, right: 16 },
+  badgeCenterLeft: { top: 16, left: '50%', transform: [{ translateX: -92 }] },
+  badgeCenterRight: { top: 16, left: '50%', transform: [{ translateX: 12 }] },
   badgeTop: { top: 16, alignSelf: 'center' },
 
   sessionBar: {
@@ -373,6 +375,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
   },
   sessionTimer: {
     color: '#F3F4F6',

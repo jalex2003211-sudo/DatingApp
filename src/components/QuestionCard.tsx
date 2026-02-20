@@ -8,7 +8,7 @@ type Props = {
   borderGlow?: string;
 };
 
-export const QuestionCard = ({ label, question, accentColor = '#A5B4FC', chipBg = 'rgba(165,180,252,0.1)', borderGlow = 'rgba(165,180,252,0.22)' }: Props) => (
+export const QuestionCard = ({ label, question, accentColor = '#A5B4FC', chipBg = 'rgba(165,180,252,0.14)', borderGlow = 'rgba(165,180,252,0.3)' }: Props) => (
   <View style={[styles.card, { borderColor: borderGlow }]}> 
     <View style={[styles.labelChip, { backgroundColor: chipBg }]}>
       <Text style={[styles.label, { color: accentColor }]}>{label}</Text>
@@ -19,12 +19,12 @@ export const QuestionCard = ({ label, question, accentColor = '#A5B4FC', chipBg 
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#1F2937',
+    backgroundColor: '#243142',
     borderRadius: 20,
     padding: 24,
     minHeight: 300,
     justifyContent: 'center',
-    borderWidth: 1
+    borderWidth: 1.2
   },
   labelChip: {
     alignSelf: 'center',

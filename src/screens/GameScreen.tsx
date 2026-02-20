@@ -39,6 +39,8 @@ export const GameScreen = ({ navigation }: Props) => {
     timerSecondsLeft,
     stats,
     activeSpeakerRole,
+    partnerA,
+    partnerB,
     isDeckExhausted,
     endReason,
     nextCard,
@@ -244,8 +246,18 @@ export const GameScreen = ({ navigation }: Props) => {
     hapticState.current = { left: false, right: false, up: false };
   }, [currentQuestionId, resetCard]);
 
-  const activeLabel = activeSpeakerRole === 'A' ? t('game.partnerAFirst') : t('game.partnerBFirst');
-  const nextLabel = activeSpeakerRole === 'A' ? t('game.partnerBFirst') : t('game.partnerAFirst');
+  const resolveGenderLabel = useCallback(
+    (role: 'A' | 'B') => {
+      const gender = role === 'A' ? partnerA.gender : partnerB.gender;
+      if (gender === 'MALE') return t('genderLabel.male');
+      if (gender === 'FEMALE') return t('genderLabel.female');
+      return t('genderLabel.neutral');
+    },
+    [partnerA.gender, partnerB.gender, t]
+  );
+
+  const activeLabel = resolveGenderLabel(activeSpeakerRole);
+  const nextLabel = resolveGenderLabel(activeSpeakerRole === 'A' ? 'B' : 'A');
 
   if (!currentQuestion) {
     return (
@@ -336,9 +348,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 10,
-    backgroundColor: 'rgba(17,24,39,0.72)',
+    backgroundColor: 'rgba(17,24,39,0.82)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)'
+    borderColor: 'rgba(255,255,255,0.24)'
   },
   badgeText: { color: '#F9FAFB', fontWeight: '800', letterSpacing: 1 },
   badgeCenterLeft: { top: 16, left: '50%', transform: [{ translateX: -92 }] },
@@ -351,8 +363,8 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 18,
     paddingHorizontal: 16,
-    backgroundColor: 'rgba(20,24,34,0.88)',
-    borderColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(20,24,34,0.92)',
+    borderColor: 'rgba(255,255,255,0.11)',
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -364,7 +376,7 @@ const styles = StyleSheet.create({
     elevation: 10
   },
   sessionTimer: { color: '#F3F4F6', fontSize: 19, fontWeight: '700', minWidth: 64 },
-  sessionStatus: { color: '#9CA3AF', fontSize: 13, fontWeight: '500' },
+  sessionStatus: { color: '#B6BDC8', fontSize: 13, fontWeight: '500' },
   sessionHeartButton: {
     width: 44,
     height: 44,

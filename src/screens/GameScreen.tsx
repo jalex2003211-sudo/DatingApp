@@ -13,7 +13,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 import { QuestionCard } from '../components/QuestionCard';
-import { getSessionQuestionsForMood } from '../engine/normalizeQuestions';
+import { getAllNormalizedQuestions, getSessionQuestionsForMood } from '../engine/normalizeQuestions';
 import { usePrefsStore } from '../state/prefsStore';
 import { FavoriteLikedBy, useFavoritesStore, useFavoriteMeta, useIsFavorite } from '../state/favoritesStore';
 import { useSessionStore } from '../state/sessionStore';
@@ -31,6 +31,7 @@ export const GameScreen = ({ navigation }: Props) => {
   const {
     mood,
     relationshipStage,
+    customDeckIds,
     currentQuestionId,
     questionsShown,
     currentPhase,
@@ -56,9 +57,15 @@ export const GameScreen = ({ navigation }: Props) => {
   const ensureFavorite = useFavoritesStore((s) => s.ensureFavorite);
 
   const normalizedDeck = useMemo(() => {
+    if (customDeckIds?.length) {
+      const allQuestions = getAllNormalizedQuestions();
+      const customDeckSet = new Set(customDeckIds);
+      return allQuestions.filter((question) => customDeckSet.has(question.id));
+    }
+
     if (!mood || !relationshipStage) return [];
     return getSessionQuestionsForMood(mood, relationshipStage);
-  }, [mood, relationshipStage]);
+  }, [customDeckIds, mood, relationshipStage]);
 
   const currentQuestion = useMemo(() => {
     if (!currentQuestionId) return null;
@@ -217,6 +224,11 @@ export const GameScreen = ({ navigation }: Props) => {
 
   const hapticState = useRef({ left: false, right: false, up: false });
 
+  const onLeftRef = useRef<() => void>(() => {});
+  const onRightRef = useRef<() => void>(() => {});
+  const onUpRef = useRef<() => void>(() => {});
+  const maybeHapticRef = useRef<(dx: number, dy: number) => void>(() => {});
+
   const maybeHaptic = useCallback(
     async (dx: number, dy: number) => {
       const up = dy < -UP_THRESHOLD && Math.abs(dx) < H_THRESHOLD;
@@ -241,29 +253,51 @@ export const GameScreen = ({ navigation }: Props) => {
     [H_THRESHOLD, UP_THRESHOLD]
   );
 
+  useEffect(() => {
+    onLeftRef.current = onSwipeLeftNext;
+  }, [onSwipeLeftNext]);
+
+  useEffect(() => {
+    onRightRef.current = onLikeAndNext;
+  }, [onLikeAndNext]);
+
+  useEffect(() => {
+    onUpRef.current = onSwipeUpSkip;
+  }, [onSwipeUpSkip]);
+
+  useEffect(() => {
+    maybeHapticRef.current = (dx: number, dy: number) => {
+      void maybeHaptic(dx, dy);
+    };
+  }, [maybeHaptic]);
+
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: () => true,
       onPanResponderMove: (_, gesture) => {
         translate.setValue({ x: gesture.dx, y: gesture.dy });
-        void maybeHaptic(gesture.dx, gesture.dy);
+        maybeHapticRef.current(gesture.dx, gesture.dy);
       },
       onPanResponderRelease: (_, gesture) => {
         const dx = gesture.dx;
         const dy = gesture.dy;
 
+        if (__DEV__) {
+          console.log('[swipe]', { dx, dy, currentId: currentQuestion?.id });
+        }
+
         if (dy < -UP_THRESHOLD && Math.abs(dx) < H_THRESHOLD) {
-          onSwipeUpSkip();
+          onUpRef.current();
           return;
         }
 
         if (dx < -H_THRESHOLD) {
-          onSwipeLeftNext();
+          onLeftRef.current();
           return;
         }
 
         if (dx > H_THRESHOLD) {
-          onLikeAndNext();
+          onRightRef.current();
           return;
         }
 
@@ -374,7 +408,7 @@ export const GameScreen = ({ navigation }: Props) => {
             if (__DEV__) {
               console.log('[fav] press', { id: currentQuestion?.id, lang: language });
             }
-            onLikeAndNext();
+            onRightRef.current();
           }}
         >
           <Text style={[styles.sessionHeartText, { color: activeTheme.heart }]}>{favorite ? '♥' : '♡'}</Text>

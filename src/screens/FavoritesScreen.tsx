@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { AppButton } from '../components/AppButton';
 import { FavoriteEntry, FavoriteLikedBy, useFavoritesStore } from '../state/favoritesStore';
@@ -8,7 +8,6 @@ import { usePrefsStore } from '../state/prefsStore';
 import { useSessionStore } from '../state/sessionStore';
 import { Question, RootStackParamList } from '../types';
 import { getAllNormalizedQuestions } from '../engine/normalizeQuestions';
-import { shuffle } from '../utils/shuffle';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Favorites'>;
 type FilterOption = 'all' | 'male' | 'female';
@@ -55,10 +54,16 @@ export const FavoritesScreen = ({ navigation }: Props) => {
   );
 
   const onPressPlayFavorites = () => {
-    const favoriteDeck = shuffle(favoriteItems.map((item) => item.question));
-    const result = startFavoritesSession(favoriteDeck);
+    const favoriteIds = favoriteItems.map((item) => item.question.id);
+
+    if (favoriteIds.length === 0) {
+      Alert.alert(t('favoritesTitle'), t('noFavorites'));
+      return;
+    }
+
+    const result = startFavoritesSession(favoriteIds);
     if (result.ok) {
-      navigation.replace('Game');
+      navigation.navigate('Game');
     }
   };
 

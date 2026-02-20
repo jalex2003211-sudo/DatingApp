@@ -69,13 +69,15 @@ type SessionState = {
   isDeckExhausted: boolean;
   endReason: SessionEndReason | null;
   lastError: 'PREMIUM_REQUIRED' | 'INVALID_STATE' | 'MISSING_RELATIONSHIP_STAGE' | null;
+  customDeckIds?: string[] | null;
+  customDeckTitle?: string | null;
   setRelationshipStage: (stage: RelationshipStage) => void;
   setPartnerProfiles: (profiles: { partnerA: PartnerProfile; partnerB: PartnerProfile }) => void;
   setActiveSpeakerRole: (role: PlayerRole) => void;
   getActiveThemeTokens: () => RoleThemeTokens;
   toggleActiveSpeakerRole: () => void;
   startSession: (mood: Mood, duration: number, overrideQuestions?: Question[]) => StartSessionResult;
-  startFavoritesSession: (favoriteQuestions: Question[], duration?: number) => StartSessionResult;
+  startFavoritesSession: (favoriteIds: string[], duration?: number) => StartSessionResult;
   nextCard: () => void;
   skipCard: () => void;
   tick: () => void;
@@ -120,7 +122,9 @@ const initialState = {
   stats: initialStats,
   isDeckExhausted: false,
   endReason: null,
-  lastError: null
+  lastError: null,
+  customDeckIds: null,
+  customDeckTitle: null
 };
 
 let activeJourneySession: EmotionalJourneySession | null = null;
@@ -130,6 +134,18 @@ const buildSessionQueue = (questions: Question[]): string[] => {
   const seen = new Set<string>();
   return questions
     .map((question) => question?.id)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    .filter((id) => {
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+};
+
+
+const buildIdQueue = (ids: string[]): string[] => {
+  const seen = new Set<string>();
+  return ids
     .filter((id): id is string => typeof id === 'string' && id.length > 0)
     .filter((id) => {
       if (seen.has(id)) return false;
@@ -227,6 +243,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({
       mood,
       duration,
+      customDeckIds: null,
+      customDeckTitle: null,
       timerSecondsLeft: minutesToSeconds(duration),
       paused: false,
       completed: false,
@@ -243,7 +261,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
     return result;
   },
-  startFavoritesSession: (favoriteQuestions, duration = 10) => {
+  startFavoritesSession: (favoriteIds, duration = 10) => {
     const relationshipStage = get().relationshipStage;
     if (!relationshipStage) {
       const invalidStateResult: StartSessionResult = {
@@ -255,7 +273,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       return invalidStateResult;
     }
 
-    if (!favoriteQuestions.length) {
+    if (!favoriteIds.length) {
       const invalidStateResult: StartSessionResult = {
         ok: false,
         reason: 'INVALID_STATE',
@@ -265,7 +283,20 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       return invalidStateResult;
     }
 
-    return get().startSession('FUN', duration, favoriteQuestions);
+    const result = get().startSession('FUN', duration);
+    if (!result.ok) return result;
+
+    const sessionQueue = buildIdQueue(favoriteIds);
+
+    set({
+      customDeckIds: favoriteIds,
+      customDeckTitle: 'favorites',
+      sessionQueue,
+      ...getQueuePatch(sessionQueue, 0),
+      questionsShown: []
+    });
+
+    return result;
   },
   nextCard: () => {
     const currentState = get();
@@ -402,6 +433,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       summary,
       sessionSummary,
       endReason: reason,
+      customDeckIds: null,
+      customDeckTitle: null,
       isDeckExhausted: reason === 'DECK_EXHAUSTED' ? true : state.isDeckExhausted,
       lastSessionSummary,
       stats: {

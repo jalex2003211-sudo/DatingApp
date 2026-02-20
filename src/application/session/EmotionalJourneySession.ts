@@ -29,6 +29,10 @@ export type JourneySnapshot = {
   upcomingQuestion: Question | null;
 };
 
+export type StartSessionResult =
+  | { ok: true }
+  | { ok: false; reason: 'PREMIUM_REQUIRED' | 'INVALID_STATE'; message?: string };
+
 export class EmotionalJourneySession {
   private readonly engine: EmotionalJourneyEngine;
   private readonly premiumGate: PremiumGate;
@@ -51,9 +55,16 @@ export class EmotionalJourneySession {
     this.memory = this.engine.createMemory();
   }
 
-  public start(): JourneySnapshot {
+  public start(): { result: StartSessionResult; snapshot: JourneySnapshot | null } {
     if (!this.premiumGate.canAccessMood(this.config.mood)) {
-      throw new Error('Selected mood requires premium access.');
+      return {
+        result: {
+          ok: false,
+          reason: 'PREMIUM_REQUIRED',
+          message: 'Selected mood requires premium access.'
+        },
+        snapshot: null
+      };
     }
 
     this.eventBus.emit('session_started', { mood: this.config.mood });
@@ -66,7 +77,10 @@ export class EmotionalJourneySession {
     }
 
     this.upcomingQuestion = this.pickQuestion();
-    return this.getSnapshot();
+    return {
+      result: { ok: true },
+      snapshot: this.getSnapshot()
+    };
   }
 
   public next(): JourneySnapshot {

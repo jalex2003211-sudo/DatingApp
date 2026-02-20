@@ -31,6 +31,16 @@ type LastSessionSummary = {
   reflectionMessage?: string;
 };
 
+export type SessionSummaryPayload = {
+  mood: Mood | null;
+  viewed: number;
+  skipped: number;
+  favorites: number;
+  peakPhaseReached: StageType;
+  avgIntensityExperienced: number;
+  endReason: SessionEndReason;
+};
+
 type SessionState = {
   mood: Mood | null;
   duration: number;
@@ -42,9 +52,12 @@ type SessionState = {
   targetIntensity: number;
   relationshipStage: RelationshipStage;
   isPremium: boolean;
+  peakPhaseReached: StageType;
+  avgIntensityExperienced: number;
   paused: boolean;
   completed: boolean;
   summary: SessionSummary | null;
+  sessionSummary: SessionSummaryPayload | null;
   lastSessionSummary: LastSessionSummary | null;
   stats: SessionStats;
   isDeckExhausted: boolean;
@@ -80,9 +93,12 @@ const initialState = {
   targetIntensity: 2,
   relationshipStage: 'longTerm' as RelationshipStage,
   isPremium: false,
+  peakPhaseReached: 'warmup' as StageType,
+  avgIntensityExperienced: 0,
   paused: false,
   completed: false,
   summary: null,
+  sessionSummary: null,
   lastSessionSummary: null,
   stats: initialStats,
   isDeckExhausted: false,
@@ -98,6 +114,8 @@ const patchFromSnapshot = (snapshot: JourneySnapshot) => ({
   questionsShown: snapshot.memory.shownQuestionIds,
   currentPhase: snapshot.emotionalState.phase,
   targetIntensity: Number(snapshot.emotionalState.intensity.toFixed(2)),
+  peakPhaseReached: snapshot.memory.peakPhaseReached,
+  avgIntensityExperienced: Number(snapshot.memory.averageIntensityExperienced.toFixed(2)),
   stats: {
     viewed: snapshot.memory.shownQuestionIds.length,
     skipped: snapshot.memory.skipsCount,
@@ -147,6 +165,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       paused: false,
       completed: false,
       summary: null,
+      sessionSummary: null,
       isDeckExhausted: false,
       endReason: null,
       lastError: null,
@@ -203,6 +222,17 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const resolvedAvgIntensity = summary?.averageIntensity ?? currentState.stats.averageIntensity;
     const resolvedPeakPhase = summary?.peakPhase ?? currentState.stats.peakPhase;
     const resolvedSafetyLevel = summary?.safetyLevel ?? currentState.stats.safetyLevel;
+    const resolvedAvgExperienced = summary?.averageIntensity ?? currentState.avgIntensityExperienced;
+
+    const sessionSummary: SessionSummaryPayload = {
+      mood: currentState.mood,
+      viewed: currentState.stats.viewed,
+      skipped: currentState.stats.skipped,
+      favorites: currentState.stats.favoritesAdded,
+      peakPhaseReached: resolvedPeakPhase,
+      avgIntensityExperienced: resolvedAvgExperienced,
+      endReason: reason
+    };
 
     const lastSessionSummary: LastSessionSummary = {
       reason,
@@ -222,6 +252,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       completed: true,
       paused: true,
       summary,
+      sessionSummary,
       endReason: reason,
       isDeckExhausted: reason === 'DECK_EXHAUSTED' ? true : state.isDeckExhausted,
       lastSessionSummary,
@@ -230,7 +261,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         averageIntensity: resolvedAvgIntensity,
         peakPhase: resolvedPeakPhase,
         safetyLevel: resolvedSafetyLevel
-      }
+      },
+      peakPhaseReached: resolvedPeakPhase,
+      avgIntensityExperienced: resolvedAvgExperienced
     }));
   },
   resetSession: () => {

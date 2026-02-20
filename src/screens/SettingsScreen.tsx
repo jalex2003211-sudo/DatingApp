@@ -1,10 +1,14 @@
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { AppButton } from '../components/AppButton';
 import i18n from '../i18n';
 import { usePrefsStore } from '../state/prefsStore';
+import { RootStackParamList } from '../types';
 
-export const SettingsScreen = () => {
+type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
+
+export const SettingsScreen = ({ navigation }: Props) => {
   const { t } = useTranslation();
   const language = usePrefsStore((s) => s.language);
   const setLanguage = usePrefsStore((s) => s.setLanguage);
@@ -17,6 +21,7 @@ export const SettingsScreen = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{t('settingsTitle')}</Text>
+      <AppButton label={t('profile.editProfile')} variant="secondary" onPress={() => navigation.navigate('ProfileSetup')} />
       <Text style={styles.label}>{t('language')}</Text>
       <AppButton
         label={`${t('english')}${language === 'en' ? ' ✓' : ''}`}
@@ -35,5 +40,5 @@ export const SettingsScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#111827', padding: 24, justifyContent: 'center' },
   title: { color: '#F9FAFB', fontSize: 30, fontWeight: '700', marginBottom: 12 },
-  label: { color: '#D1D5DB', fontSize: 16, marginBottom: 10 }
+  label: { color: '#D1D5DB', fontSize: 16, marginBottom: 10, marginTop: 8 }
 });

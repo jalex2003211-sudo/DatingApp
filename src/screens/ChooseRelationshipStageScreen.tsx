@@ -28,7 +28,7 @@ export const ChooseRelationshipStageScreen = ({ navigation }: Props) => {
           label={t(`relationshipStage.option.${option.key}`)}
           onPress={() => {
             setRelationshipStage(option.stage);
-            navigation.navigate('ChooseRoles');
+            navigation.navigate('ChooseMood');
           }}
         />
       ))}

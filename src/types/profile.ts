@@ -1,10 +1,15 @@
-export interface AdaptiveProfile {
-  preferredMoods: Record<string, number>; 
-  intensityTolerance: number; // dynamic 1–5 baseline
+export type Gender = 'male' | 'female' | 'custom';
 
-  skipRateByIntensity: Record<number, number>;
+export type PartnerProfile = {
+  id: 'A' | 'B';
+  name: string;
+  gender: Gender;
+  accent?: 'auto' | 'blue' | 'pink' | 'purple' | 'teal';
+  photoUri?: string | null;
+};
 
-  favoritesByStage: Record<string, number>;
-
-  sessionsCompleted: number;
-}
+export type UserProfile = {
+  partnerA: PartnerProfile;
+  partnerB: PartnerProfile;
+  updatedAt: number;
+};

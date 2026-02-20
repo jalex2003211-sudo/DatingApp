@@ -14,7 +14,6 @@ import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 import { QuestionCard } from '../components/QuestionCard';
 import { getNormalizedQuestionsForMood } from '../engine/normalizeQuestions';
-import { SessionEngine } from '../engine/sessionEngine';
 import { useFavoritesStore } from '../state/favoritesStore';
 import { usePrefsStore } from '../state/prefsStore';
 import { useSessionStore } from '../state/sessionStore';
@@ -35,8 +34,7 @@ export const GameScreen = ({ navigation }: Props) => {
     questionsShown,
     currentPhase,
     targetIntensity,
-    relationshipStage,
-    isPremium,
+    nextQuestionId,
     timerSecondsLeft,
     stats,
     nextCard,
@@ -60,16 +58,9 @@ export const GameScreen = ({ navigation }: Props) => {
   }, [currentQuestionId, normalizedDeck]);
 
   const nextQuestion = useMemo(() => {
-    if (!mood) return null;
-    const engine = new SessionEngine(normalizedDeck, { mood, relationshipStage, isPremium });
-    return (
-      engine.getNextQuestion({
-        currentPhase,
-        targetIntensity,
-        questionsShown,
-      }) ?? null
-    );
-  }, [currentPhase, isPremium, mood, normalizedDeck, questionsShown, relationshipStage, targetIntensity]);
+    if (!nextQuestionId) return null;
+    return normalizedDeck.find((q) => q.id === nextQuestionId) ?? null;
+  }, [nextQuestionId, normalizedDeck]);
 
   useEffect(() => {
     const interval = setInterval(() => tick(), 1000);

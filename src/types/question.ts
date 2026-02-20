@@ -29,7 +29,7 @@ export interface Question {
 
   stageType: StageType;
 
-  relationshipSuitability: RelationshipStage[];
+  relationshipSuitability?: RelationshipStage[];
 
   premium: boolean;
 

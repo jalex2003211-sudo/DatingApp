@@ -21,7 +21,7 @@ export const ChooseMoodScreen = ({ navigation }: Props) => {
       <Text style={styles.title}>{t('chooseMoodTitle')}</Text>
       {moods.map((mood) => {
         const isIntimateLocked = mood === 'INTIMATE' && !isPremium;
-        const label = isIntimateLocked ? `🔒 ${t(`mood.${mood}`)} · Premium` : t(`mood.${mood}`);
+        const label = isIntimateLocked ? `🔒 ${t(`mood.${mood}`)} · ${t('premium.label')}` : t(`mood.${mood}`);
 
         return (
           <AppButton

@@ -15,6 +15,16 @@ export type RelationshipStage =
   | 'married'
   | 'reconnecting';
 
+export type Gender = 'MALE' | 'FEMALE' | 'NEUTRAL';
+
+export type PlayerRole = 'A' | 'B';
+
+export type PartnerProfile = {
+  role: PlayerRole;
+  gender: Gender;
+  displayName?: string;
+};
+
 export type Intensity = 1 | 2 | 3 | 4 | 5;
 
 export type Question = {
@@ -36,6 +46,8 @@ export type Question = {
 export type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
+  ChooseRelationshipStage: undefined;
+  ChooseRoles: undefined;
   ChooseMood: undefined;
   ChooseDuration: { mood: Mood };
   Game: undefined;

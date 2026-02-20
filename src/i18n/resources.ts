@@ -6,8 +6,29 @@ export const resources = {
       homeTitle: 'Ready for tonight?',
       homeSubtitle: 'Pick a mood and start in under 30 seconds.',
       startGame: 'Start game',
+      continue: 'Continue',
       chooseMoodTitle: 'Choose mood',
       chooseDurationTitle: 'Choose duration',
+      relationshipStage: {
+        title: 'What’s your relationship stage?',
+        option: {
+          breakIce: 'Break the ice',
+          newDating: 'New dating',
+          longTerm: 'Long term',
+          married: 'Married',
+          reconnecting: 'Reconnecting'
+        }
+      },
+      roles: {
+        title: 'Choose roles',
+        partnerA: 'Partner A',
+        partnerB: 'Partner B'
+      },
+      gender: {
+        male: 'Male',
+        female: 'Female',
+        neutral: 'Neutral'
+      },
       mood: {
         FUN: 'Fun',
         DEEP: 'Deep',
@@ -15,13 +36,19 @@ export const resources = {
       },
       minutes: '{{count}} min',
       game: {
-        youFirst: 'You first',
-        partnerFirst: 'Partner first',
+        partnerAFirst: 'Partner A first',
+        partnerBFirst: 'Partner B first',
         next: 'Next',
+        like: 'Like',
         skip: 'Skip',
         pause: 'Pause',
         resume: 'Resume',
-        swipeHint: 'Tip: swipe left for next card'
+        swipeHint: 'Tip: swipe left for next card',
+        sessionStatus: '{{seen}} seen · {{skipped}} skipped'
+      },
+      errors: {
+        relationshipStageRequiredTitle: 'Relationship stage required',
+        relationshipStageRequiredBody: 'Please choose your relationship stage before starting a session.'
       },
       end: {
         title: 'Session complete',
@@ -62,7 +89,8 @@ export const resources = {
       premium: {
         requiredTitle: 'Premium required',
         requiredBody: 'This mood is available on Premium. Upgrade to continue.',
-        cta: 'Get Premium'
+        cta: 'Get Premium',
+        label: 'Premium'
       }
     }
   },
@@ -73,8 +101,29 @@ export const resources = {
       homeTitle: 'Έτοιμοι για απόψε;',
       homeSubtitle: 'Διάλεξε διάθεση και ξεκίνα σε λιγότερο από 30".',
       startGame: 'Έναρξη',
+      continue: 'Συνέχεια',
       chooseMoodTitle: 'Διάλεξε διάθεση',
       chooseDurationTitle: 'Διάλεξε διάρκεια',
+      relationshipStage: {
+        title: 'Σε τι φάση είστε;',
+        option: {
+          breakIce: 'Σπάσιμο πάγου',
+          newDating: 'Νέο dating',
+          longTerm: 'Μακροχρόνια σχέση',
+          married: 'Παντρεμένοι',
+          reconnecting: 'Επανασύνδεση'
+        }
+      },
+      roles: {
+        title: 'Επιλογή ρόλων',
+        partnerA: 'Partner A',
+        partnerB: 'Partner B'
+      },
+      gender: {
+        male: 'Άντρας',
+        female: 'Γυναίκα',
+        neutral: 'Ουδέτερο'
+      },
       mood: {
         FUN: 'Διασκεδαστική',
         DEEP: 'Βαθιά',
@@ -82,13 +131,19 @@ export const resources = {
       },
       minutes: '{{count}} λεπτά',
       game: {
-        youFirst: 'Εσύ πρώτος/η',
-        partnerFirst: 'Ο/Η σύντροφος πρώτος/η',
+        partnerAFirst: 'Ξεκινά ο/η Partner A',
+        partnerBFirst: 'Ξεκινά ο/η Partner B',
         next: 'Επόμενη',
+        like: 'Μου αρέσει',
         skip: 'Παράλειψη',
         pause: 'Παύση',
         resume: 'Συνέχεια',
-        swipeHint: 'Συμβουλή: σύρε αριστερά για επόμενη κάρτα'
+        swipeHint: 'Συμβουλή: σύρε αριστερά για επόμενη κάρτα',
+        sessionStatus: '{{seen}} είδατε · {{skipped}} προσπεράσατε'
+      },
+      errors: {
+        relationshipStageRequiredTitle: 'Απαιτείται στάδιο σχέσης',
+        relationshipStageRequiredBody: 'Διαλέξτε πρώτα στάδιο σχέσης για να ξεκινήσει το session.'
       },
       end: {
         title: 'Η συνεδρία ολοκληρώθηκε',
@@ -129,7 +184,8 @@ export const resources = {
       premium: {
         requiredTitle: 'Απαιτείται Premium',
         requiredBody: 'Αυτή η διάθεση είναι διαθέσιμη μόνο στο Premium. Κάνε αναβάθμιση για συνέχεια.',
-        cta: 'Απόκτηση Premium'
+        cta: 'Απόκτηση Premium',
+        label: 'Premium'
       }
     }
   }

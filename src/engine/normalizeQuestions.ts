@@ -53,7 +53,26 @@ const normalizeDeck = (mood: Mood): Question[] => {
   }));
 };
 
+const boostStageWeight = (questions: Question[], relationshipStage: RelationshipStage): Question[] =>
+  questions.map((question) => {
+    const suitable = question.relationshipSuitability?.includes(relationshipStage) ?? true;
+    return {
+      ...question,
+      weight: (question.weight ?? 0) + (suitable ? 0.6 : 0)
+    };
+  });
+
 export const getNormalizedQuestionsForMood = (mood: Mood): Question[] => normalizeDeck(mood);
+
+export const getSessionQuestionsForMood = (mood: Mood, relationshipStage: RelationshipStage): Question[] => {
+  const normalized = normalizeDeck(mood);
+  const stageMatched = normalized.filter(
+    (question) => !question.relationshipSuitability || question.relationshipSuitability.includes(relationshipStage)
+  );
+
+  if (stageMatched.length >= 8) return stageMatched;
+  return boostStageWeight(normalized, relationshipStage);
+};
 
 export const getAllNormalizedQuestions = (): Question[] =>
   (Object.keys(decksByMood) as Mood[]).flatMap((mood) => normalizeDeck(mood));

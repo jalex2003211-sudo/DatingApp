@@ -37,6 +37,8 @@ export const GameScreen = ({ navigation }: Props) => {
     nextQuestionId,
     timerSecondsLeft,
     stats,
+    isDeckExhausted,
+    endReason,
     nextCard,
     skipCard,
     tick,
@@ -68,11 +70,17 @@ export const GameScreen = ({ navigation }: Props) => {
   }, [tick]);
 
   useEffect(() => {
-    if (timerSecondsLeft <= 0) {
-      endSession();
-      navigation.replace('End');
+    if (timerSecondsLeft <= 0 && !endReason) {
+      endSession({ reason: 'TIME_UP' });
+      navigation.replace('End', { reason: 'TIME_UP' });
     }
-  }, [timerSecondsLeft, navigation, endSession]);
+  }, [timerSecondsLeft, navigation, endReason, endSession]);
+
+  useEffect(() => {
+    if (isDeckExhausted) {
+      navigation.replace('End', { reason: 'DECK_EXHAUSTED' });
+    }
+  }, [isDeckExhausted, navigation]);
 
   const favorite = currentQuestion ? isFavorite(currentQuestion.id) : false;
   const [debugVisible, setDebugVisible] = useState(false);
@@ -247,7 +255,7 @@ export const GameScreen = ({ navigation }: Props) => {
   if (!currentQuestion) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>{t('loading')}</Text>
+        <Text style={styles.title}>{isDeckExhausted ? t('end.deckExhaustedTitle') : t('loading')}</Text>
       </View>
     );
   }

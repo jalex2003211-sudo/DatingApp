@@ -40,7 +40,8 @@ const intensityFromProgress = (mood: Mood, index: number, total: number): 1 | 2 
 };
 
 const normalizeDeck = (mood: Mood): Question[] => {
-  const deck = decksByMood[mood];
+  const deck = decksByMood[mood] ?? [];
+  if (!deck.length) return [];
 
   return deck.map((question, index) => ({
     ...question,

@@ -6,6 +6,8 @@ import { getNormalizedQuestionsForMood } from '../engine/normalizeQuestions';
 import { Mood, RelationshipStage, StageType } from '../types';
 import { minutesToSeconds } from '../utils/time';
 
+export type SessionEndReason = 'TIME_UP' | 'DECK_EXHAUSTED' | 'USER_ENDED';
+
 type SessionStats = {
   viewed: number;
   skipped: number;
@@ -13,6 +15,20 @@ type SessionStats = {
   averageIntensity: number;
   peakPhase: StageType;
   safetyLevel: number;
+};
+
+type LastSessionSummary = {
+  reason: SessionEndReason;
+  viewed: number;
+  skipped: number;
+  favoritesAdded: number;
+  durationPlayed: number;
+  mood: Mood | null;
+  relationshipStage: RelationshipStage;
+  avgIntensity: number;
+  peakPhase: StageType;
+  safetyLevel: number;
+  reflectionMessage?: string;
 };
 
 type SessionState = {
@@ -29,7 +45,10 @@ type SessionState = {
   paused: boolean;
   completed: boolean;
   summary: SessionSummary | null;
+  lastSessionSummary: LastSessionSummary | null;
   stats: SessionStats;
+  isDeckExhausted: boolean;
+  endReason: SessionEndReason | null;
   lastError: 'PREMIUM_REQUIRED' | 'INVALID_STATE' | null;
   startSession: (mood: Mood, duration: number) => StartSessionResult;
   nextCard: () => void;
@@ -37,7 +56,7 @@ type SessionState = {
   tick: () => void;
   togglePause: () => void;
   registerFavoriteAdded: () => void;
-  endSession: () => void;
+  endSession: (opts?: { reason?: SessionEndReason }) => void;
   resetSession: () => void;
 };
 
@@ -64,7 +83,10 @@ const initialState = {
   paused: false,
   completed: false,
   summary: null,
+  lastSessionSummary: null,
   stats: initialStats,
+  isDeckExhausted: false,
+  endReason: null,
   lastError: null
 };
 
@@ -125,6 +147,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       paused: false,
       completed: false,
       summary: null,
+      isDeckExhausted: false,
+      endReason: null,
       lastError: null,
       ...patchFromSnapshot(snapshot)
     });
@@ -134,12 +158,30 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   nextCard: () => {
     if (!activeJourneySession) return;
     const snapshot = activeJourneySession.next();
-    set({ ...patchFromSnapshot(snapshot) });
+    const patch = patchFromSnapshot(snapshot);
+
+    set({
+      ...patch,
+      isDeckExhausted: snapshot.remainingQuestionsCount <= 0 || patch.currentQuestionId === null
+    });
+
+    if (snapshot.remainingQuestionsCount <= 0 || patch.currentQuestionId === null) {
+      get().endSession({ reason: 'DECK_EXHAUSTED' });
+    }
   },
   skipCard: () => {
     if (!activeJourneySession) return;
     const snapshot = activeJourneySession.skip();
-    set({ ...patchFromSnapshot(snapshot) });
+    const patch = patchFromSnapshot(snapshot);
+
+    set({
+      ...patch,
+      isDeckExhausted: snapshot.remainingQuestionsCount <= 0 || patch.currentQuestionId === null
+    });
+
+    if (snapshot.remainingQuestionsCount <= 0 || patch.currentQuestionId === null) {
+      get().endSession({ reason: 'DECK_EXHAUSTED' });
+    }
   },
   tick: () => {
     const { paused, timerSecondsLeft } = get();
@@ -152,24 +194,47 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const snapshot = activeJourneySession.favorite();
     set({ ...patchFromSnapshot(snapshot) });
   },
-  endSession: () => {
+  endSession: ({ reason = 'USER_ENDED' } = {}) => {
+    const currentState = get();
+    if (currentState.completed && currentState.endReason === reason) return;
+
     const summary = activeJourneySession?.complete() ?? null;
+
+    const resolvedAvgIntensity = summary?.averageIntensity ?? currentState.stats.averageIntensity;
+    const resolvedPeakPhase = summary?.peakPhase ?? currentState.stats.peakPhase;
+    const resolvedSafetyLevel = summary?.safetyLevel ?? currentState.stats.safetyLevel;
+
+    const lastSessionSummary: LastSessionSummary = {
+      reason,
+      viewed: currentState.stats.viewed,
+      skipped: currentState.stats.skipped,
+      favoritesAdded: currentState.stats.favoritesAdded,
+      durationPlayed: Math.max(0, minutesToSeconds(currentState.duration) - currentState.timerSecondsLeft),
+      mood: currentState.mood,
+      relationshipStage: currentState.relationshipStage,
+      avgIntensity: resolvedAvgIntensity,
+      peakPhase: resolvedPeakPhase,
+      safetyLevel: resolvedSafetyLevel,
+      reflectionMessage: summary?.reflectionMessage
+    };
+
     set((state) => ({
       completed: true,
       paused: true,
       summary,
-      stats: summary
-        ? {
-            ...state.stats,
-            averageIntensity: summary.averageIntensity,
-            peakPhase: summary.peakPhase,
-            safetyLevel: summary.safetyLevel
-          }
-        : state.stats
+      endReason: reason,
+      isDeckExhausted: reason === 'DECK_EXHAUSTED' ? true : state.isDeckExhausted,
+      lastSessionSummary,
+      stats: {
+        ...state.stats,
+        averageIntensity: resolvedAvgIntensity,
+        peakPhase: resolvedPeakPhase,
+        safetyLevel: resolvedSafetyLevel
+      }
     }));
   },
   resetSession: () => {
     activeJourneySession = null;
-    set(initialState);
+    set((state) => ({ ...initialState, lastSessionSummary: state.lastSessionSummary }));
   }
 }));

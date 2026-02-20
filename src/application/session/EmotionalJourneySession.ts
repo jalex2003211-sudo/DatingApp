@@ -27,6 +27,7 @@ export type JourneySnapshot = {
   memory: SessionMemory;
   currentQuestion: Question | null;
   upcomingQuestion: Question | null;
+  remainingQuestionsCount: number;
 };
 
 export type StartSessionResult =
@@ -127,12 +128,18 @@ export class EmotionalJourneySession {
       emotionalState: this.emotionalState,
       memory: this.memory,
       currentQuestion: this.currentQuestion,
-      upcomingQuestion: this.upcomingQuestion
+      upcomingQuestion: this.upcomingQuestion,
+      remainingQuestionsCount: this.getRemainingQuestionsCount()
     };
   }
 
   public getLatestSummary(): SessionSummary | null {
     return this.memoryRepository.getLatestSummary();
+  }
+
+
+  private getRemainingQuestionsCount(): number {
+    return this.questions.filter((question) => !this.memory.shownQuestionIds.includes(question.id)).length;
   }
 
   private pickQuestion(): Question | null {

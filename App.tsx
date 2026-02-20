@@ -17,6 +17,7 @@ import { EndScreen } from './src/screens/EndScreen';
 import { FavoritesScreen } from './src/screens/FavoritesScreen';
 import { GameScreen } from './src/screens/GameScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
+import { PremiumScreen } from './src/screens/PremiumScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { RootStackParamList } from './src/types';
@@ -41,6 +42,7 @@ export default function App() {
             <Stack.Screen name="Game" component={GameScreen} />
             <Stack.Screen name="End" component={EndScreen} />
             <Stack.Screen name="Favorites" component={FavoritesScreen} />
+            <Stack.Screen name="Premium" component={PremiumScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
           </Stack.Navigator>
         </NavigationContainer>

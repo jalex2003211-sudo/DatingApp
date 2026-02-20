@@ -9,6 +9,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 import { QuestionCard } from '../components/QuestionCard';
@@ -25,6 +26,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
 export const GameScreen = ({ navigation }: Props) => {
   const { t } = useTranslation();
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const language = usePrefsStore((s) => s.language);
   const {
@@ -36,12 +38,10 @@ export const GameScreen = ({ navigation }: Props) => {
     relationshipStage,
     isPremium,
     timerSecondsLeft,
-    paused,
     stats,
     nextCard,
     skipCard,
     tick,
-    togglePause,
     endSession,
     registerFavoriteAdded,
   } = useSessionStore();
@@ -261,19 +261,31 @@ export const GameScreen = ({ navigation }: Props) => {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.topRow}>
-        <Text style={styles.timer}>{formatCountdown(timerSecondsLeft)}</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={[styles.headerWrap, { paddingTop: insets.top + 10 }]}>
+        <View style={styles.topRow}>
+          <Text style={styles.timer}>{formatCountdown(timerSecondsLeft)}</Text>
 
-        <Pressable
-          style={styles.heart}
-          onPress={() => {
-            if (!favorite) registerFavoriteAdded();
-            toggleFavorite(currentQuestion.id);
-          }}
-        >
-          <Text style={styles.heartText}>{favorite ? '♥' : '♡'}</Text>
-        </Pressable>
+          <Pressable
+            style={styles.heart}
+            onPress={() => {
+              if (!favorite) registerFavoriteAdded();
+              toggleFavorite(currentQuestion.id);
+            }}
+          >
+            <Text style={styles.heartText}>{favorite ? '♥' : '♡'}</Text>
+          </Pressable>
+        </View>
+
+        {__DEV__ ? (
+          <View style={styles.devOverlay}>
+            <Text style={styles.devText}>Phase: {`${currentPhase.charAt(0).toUpperCase()}${currentPhase.slice(1)}`}</Text>
+            <Text style={styles.devText}>Intensity: {targetIntensity.toFixed(1)}</Text>
+            <Text style={styles.devText}>Shown: {questionsShown.length}</Text>
+            <Text style={styles.devText}>Skipped: {stats.skipped}</Text>
+            <Text style={styles.devText}>Time Left: {formatCountdown(timerSecondsLeft)}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.cardArea}>
@@ -309,50 +321,43 @@ export const GameScreen = ({ navigation }: Props) => {
         </Animated.View>
       </View>
 
-      {__DEV__ ? (
-        <View style={styles.devOverlay}>
-          <Text style={styles.devText}>phase: {currentPhase}</Text>
-          <Text style={styles.devText}>targetIntensity: {targetIntensity}</Text>
-          <Text style={styles.devText}>shown: {questionsShown.length}</Text>
-          <Text style={styles.devText}>timerSecondsLeft: {timerSecondsLeft}</Text>
-        </View>
+      {!__DEV__ && questionsShown.length < 5 ? (
+        <Text style={styles.hint}>Swipe ← next · Swipe → favorite · Swipe ↑ skip</Text>
       ) : null}
-
-      <Text style={styles.hint}>
-        ← {t('game.next')} • → {t('favorites.title') ?? 'Favorite'} • ↑ {t('game.skip')}
-      </Text>
-
-      <View style={styles.actions}>
-        <Pressable style={styles.actionButton} onPress={onSwipeLeftNext}>
-          <Text style={styles.actionText}>{t('game.next')}</Text>
-        </Pressable>
-
-        <Pressable style={styles.actionButton} onPress={onSwipeUpSkip}>
-          <Text style={styles.actionText}>{t('game.skip')}</Text>
-        </Pressable>
-
-        <Pressable style={styles.actionButton} onPress={togglePause}>
-          <Text style={styles.actionText}>{paused ? t('game.resume') : t('game.pause')}</Text>
-        </Pressable>
-      </View>
 
       <Text style={styles.stats}>
         {`${t('end.viewed')}: ${stats.viewed} • ${t('end.skipped')}: ${stats.skipped}`}
       </Text>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#111827', padding: 20, justifyContent: 'space-between' },
+  container: { flex: 1, backgroundColor: '#111827', paddingHorizontal: 20 },
   title: { color: '#FFF' },
 
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
-  timer: { color: '#A5B4FC', fontSize: 28, fontWeight: '700' },
-  heart: { padding: 10, backgroundColor: '#1F2937', borderRadius: 20 },
+  headerWrap: { alignItems: 'stretch' },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
+  timer: {
+    color: '#A5B4FC',
+    fontSize: 28,
+    fontWeight: '700',
+    lineHeight: 34,
+    letterSpacing: 0.8,
+    marginLeft: 16,
+  },
+  heart: {
+    width: 44,
+    height: 44,
+    marginRight: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1F2937',
+    borderRadius: 22,
+  },
   heartText: { color: '#F472B6', fontSize: 24 },
 
-  cardArea: { flex: 1, justifyContent: 'center' },
+  cardArea: { flex: 1, justifyContent: 'center', marginTop: 8 },
 
   backCardWrap: {
     position: 'absolute',
@@ -378,18 +383,19 @@ const styles = StyleSheet.create({
   badgeRight: { top: 16, right: 16 },
   badgeTop: { top: 16, alignSelf: 'center' },
 
-  hint: { color: '#9CA3AF', textAlign: 'center', marginTop: 10 },
-
-  actions: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginTop: 10 },
-  actionButton: { flex: 1, backgroundColor: '#374151', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  actionText: { color: '#F9FAFB', fontWeight: '600' },
+  hint: { color: '#9CA3AF', textAlign: 'center', marginBottom: 8, opacity: 0.82 },
 
   stats: { color: '#D1D5DB', textAlign: 'center', marginBottom: 8 },
   devOverlay: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    borderRadius: 8,
-    padding: 8,
+    marginTop: 8,
+    marginLeft: 16,
+    backgroundColor: 'rgba(10,15,28,0.7)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
-  devText: { color: '#93C5FD', fontSize: 12 },
+  devText: { color: '#93C5FD', fontSize: 12, lineHeight: 18 },
 });

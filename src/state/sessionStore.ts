@@ -71,6 +71,8 @@ type SessionState = {
   lastError: 'PREMIUM_REQUIRED' | 'INVALID_STATE' | 'MISSING_RELATIONSHIP_STAGE' | null;
   customDeckIds?: string[] | null;
   customDeckTitle?: string | null;
+  partnerAScore: number;
+  partnerBScore: number;
   setRelationshipStage: (stage: RelationshipStage) => void;
   setPartnerProfiles: (profiles: { partnerA: PartnerProfile; partnerB: PartnerProfile }) => void;
   setActiveSpeakerRole: (role: PlayerRole) => void;
@@ -78,6 +80,7 @@ type SessionState = {
   toggleActiveSpeakerRole: () => void;
   startSession: (mood: Mood, duration: number, overrideQuestions?: Question[]) => StartSessionResult;
   startFavoritesSession: (favoriteIds: string[], duration?: number) => StartSessionResult;
+  incrementScoreForTurn: () => void;
   nextCard: () => void;
   skipCard: () => void;
   tick: () => void;
@@ -124,7 +127,9 @@ const initialState = {
   endReason: null,
   lastError: null,
   customDeckIds: null,
-  customDeckTitle: null
+  customDeckTitle: null,
+  partnerAScore: 0,
+  partnerBScore: 0
 };
 
 let activeJourneySession: EmotionalJourneySession | null = null;
@@ -253,6 +258,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       endReason: null,
       lastError: null,
       activeSpeakerRole: 'A',
+      partnerAScore: 0,
+      partnerBScore: 0,
       ...patchFromSnapshot(snapshot),
       sessionQueue,
       questionsShown: [],
@@ -297,6 +304,15 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     });
 
     return result;
+  },
+  incrementScoreForTurn: () => {
+    set((state) => {
+      const isPartnerATurn = state.questionsShown.length % 2 === 0;
+      return {
+        partnerAScore: isPartnerATurn ? state.partnerAScore + 1 : state.partnerAScore,
+        partnerBScore: isPartnerATurn ? state.partnerBScore : state.partnerBScore + 1
+      };
+    });
   },
   nextCard: () => {
     const currentState = get();

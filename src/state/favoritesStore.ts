@@ -21,6 +21,7 @@ export type FavoritesById = Record<string, FavoriteEntry>;
 
 type FavoritesState = {
   favoritesById: FavoritesById;
+  ensureFavorite: (questionId: string, likedBy: FavoriteLikedBy) => void;
   toggleFavorite: (questionId: string, likedBy?: FavoriteLikedBy) => void;
   removeFavorite: (questionId: string) => void;
   isFavorite: (questionId: string) => boolean;
@@ -127,6 +128,29 @@ export const useFavoritesStore = create<FavoritesState>()(
   persist(
     (set, get) => ({
       favoritesById: {},
+      ensureFavorite: (questionId, likedBy) => {
+        if (!questionId) {
+          if (__DEV__) {
+            console.warn('[fav] ensure skipped: invalid id', { id: questionId });
+          }
+          return;
+        }
+
+        set((state) => {
+          if (state.favoritesById[questionId]) return state;
+
+          return {
+            favoritesById: {
+              ...state.favoritesById,
+              [questionId]: {
+                id: questionId,
+                likedBy,
+                createdAt: Date.now()
+              }
+            }
+          };
+        });
+      },
       toggleFavorite: (questionId, likedBy = 'neutral') => {
         if (!questionId) {
           if (__DEV__) {

@@ -2,8 +2,9 @@ import { create } from 'zustand';
 import { EmotionalJourneySession, JourneySnapshot, StartSessionResult } from '../application/session/EmotionalJourneySession';
 import { DEFAULT_RELATIONSHIP_PROFILE } from '../domain/profile/RelationshipProfile';
 import { SessionSummary } from '../domain/session/types';
-import { getNormalizedQuestionsForMood } from '../engine/normalizeQuestions';
-import { Mood, RelationshipStage, StageType } from '../types';
+import { getSessionQuestionsForMood } from '../engine/normalizeQuestions';
+import { getThemeTokensByRole, RoleThemeTokens } from '../theme/roleTheme';
+import { Mood, PartnerProfile, PlayerRole, RelationshipStage, StageType } from '../types';
 import { minutesToSeconds } from '../utils/time';
 
 export type SessionEndReason = 'TIME_UP' | 'DECK_EXHAUSTED' | 'USER_ENDED';
@@ -24,7 +25,7 @@ type LastSessionSummary = {
   favoritesAdded: number;
   durationPlayed: number;
   mood: Mood | null;
-  relationshipStage: RelationshipStage;
+  relationshipStage: RelationshipStage | null;
   avgIntensity: number;
   peakPhase: StageType;
   safetyLevel: number;
@@ -50,7 +51,10 @@ type SessionState = {
   questionsShown: string[];
   currentPhase: StageType;
   targetIntensity: number;
-  relationshipStage: RelationshipStage;
+  relationshipStage: RelationshipStage | null;
+  partnerA: PartnerProfile;
+  partnerB: PartnerProfile;
+  activeSpeakerRole: PlayerRole;
   isPremium: boolean;
   peakPhaseReached: StageType;
   avgIntensityExperienced: number;
@@ -62,7 +66,12 @@ type SessionState = {
   stats: SessionStats;
   isDeckExhausted: boolean;
   endReason: SessionEndReason | null;
-  lastError: 'PREMIUM_REQUIRED' | 'INVALID_STATE' | null;
+  lastError: 'PREMIUM_REQUIRED' | 'INVALID_STATE' | 'MISSING_RELATIONSHIP_STAGE' | null;
+  setRelationshipStage: (stage: RelationshipStage) => void;
+  setPartnerProfiles: (profiles: { partnerA: PartnerProfile; partnerB: PartnerProfile }) => void;
+  setActiveSpeakerRole: (role: PlayerRole) => void;
+  getActiveThemeTokens: () => RoleThemeTokens;
+  toggleActiveSpeakerRole: () => void;
   startSession: (mood: Mood, duration: number) => StartSessionResult;
   nextCard: () => void;
   skipCard: () => void;
@@ -91,7 +100,10 @@ const initialState = {
   questionsShown: [] as string[],
   currentPhase: 'warmup' as StageType,
   targetIntensity: 2,
-  relationshipStage: 'longTerm' as RelationshipStage,
+  relationshipStage: null,
+  partnerA: { role: 'A', gender: 'NEUTRAL' } as PartnerProfile,
+  partnerB: { role: 'B', gender: 'NEUTRAL' } as PartnerProfile,
+  activeSpeakerRole: 'A' as PlayerRole,
   isPremium: false,
   peakPhaseReached: 'warmup' as StageType,
   avgIntensityExperienced: 0,
@@ -128,15 +140,35 @@ const patchFromSnapshot = (snapshot: JourneySnapshot) => ({
 
 export const useSessionStore = create<SessionState>((set, get) => ({
   ...initialState,
+  setRelationshipStage: (relationshipStage) => set({ relationshipStage }),
+  setPartnerProfiles: ({ partnerA, partnerB }) => set({ partnerA, partnerB }),
+  setActiveSpeakerRole: (activeSpeakerRole) => set({ activeSpeakerRole }),
+  getActiveThemeTokens: () => {
+    const { activeSpeakerRole, partnerA, partnerB } = get();
+    return getThemeTokensByRole(activeSpeakerRole, partnerA, partnerB);
+  },
+  toggleActiveSpeakerRole: () =>
+    set((state) => ({ activeSpeakerRole: state.activeSpeakerRole === 'A' ? 'B' : 'A' })),
   startSession: (mood, duration) => {
-    const questions = getNormalizedQuestionsForMood(mood);
+    const relationshipStage = get().relationshipStage;
+    if (!relationshipStage) {
+      const invalidStateResult: StartSessionResult = {
+        ok: false,
+        reason: 'INVALID_STATE',
+        message: 'Relationship stage is required before starting a session.'
+      };
+      set({ lastError: 'MISSING_RELATIONSHIP_STAGE' });
+      return invalidStateResult;
+    }
+
+    const questions = getSessionQuestionsForMood(mood, relationshipStage);
     activeJourneySession = new EmotionalJourneySession({
       mood,
       isPremium: get().isPremium,
-      relationshipStage: get().relationshipStage,
+      relationshipStage,
       relationshipProfile: {
         ...DEFAULT_RELATIONSHIP_PROFILE,
-        stage: get().relationshipStage
+        stage: relationshipStage
       },
       questions
     });
@@ -169,6 +201,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       isDeckExhausted: false,
       endReason: null,
       lastError: null,
+      activeSpeakerRole: 'A',
       ...patchFromSnapshot(snapshot)
     });
 
@@ -179,10 +212,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const snapshot = activeJourneySession.next();
     const patch = patchFromSnapshot(snapshot);
 
-    set({
+    set((state) => ({
       ...patch,
+      activeSpeakerRole: state.activeSpeakerRole === 'A' ? 'B' : 'A',
       isDeckExhausted: snapshot.remainingQuestionsCount <= 0 || patch.currentQuestionId === null
-    });
+    }));
 
     if (snapshot.remainingQuestionsCount <= 0 || patch.currentQuestionId === null) {
       get().endSession({ reason: 'DECK_EXHAUSTED' });
@@ -193,10 +227,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const snapshot = activeJourneySession.skip();
     const patch = patchFromSnapshot(snapshot);
 
-    set({
+    set((state) => ({
       ...patch,
+      activeSpeakerRole: state.activeSpeakerRole === 'A' ? 'B' : 'A',
       isDeckExhausted: snapshot.remainingQuestionsCount <= 0 || patch.currentQuestionId === null
-    });
+    }));
 
     if (snapshot.remainingQuestionsCount <= 0 || patch.currentQuestionId === null) {
       get().endSession({ reason: 'DECK_EXHAUSTED' });

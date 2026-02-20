@@ -13,7 +13,7 @@ export const HomeScreen = ({ navigation }: Props) => {
     <View style={styles.container}>
       <Text style={styles.title}>{t('homeTitle')}</Text>
       <Text style={styles.subtitle}>{t('homeSubtitle')}</Text>
-      <AppButton label={t('startGame')} onPress={() => navigation.navigate('ChooseMood')} />
+      <AppButton label={t('startGame')} onPress={() => navigation.navigate('ChooseRelationshipStage')} />
       <AppButton label={t('favoritesTitle')} variant="secondary" onPress={() => navigation.navigate('Favorites')} />
       <AppButton label={t('settingsTitle')} variant="secondary" onPress={() => navigation.navigate('Settings')} />
     </View>

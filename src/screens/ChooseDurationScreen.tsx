@@ -10,6 +10,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ChooseDuration'>;
 export const ChooseDurationScreen = ({ navigation, route }: Props) => {
   const { t } = useTranslation();
   const startSession = useSessionStore((s) => s.startSession);
+  const relationshipStage = useSessionStore((s) => s.relationshipStage);
 
   return (
     <View style={styles.container}>
@@ -19,10 +20,20 @@ export const ChooseDurationScreen = ({ navigation, route }: Props) => {
           key={minutes}
           label={t('minutes', { count: minutes })}
           onPress={() => {
+            if (!relationshipStage) {
+              Alert.alert(t('errors.relationshipStageRequiredTitle'), t('errors.relationshipStageRequiredBody'));
+              return;
+            }
+
             const result = startSession(route.params.mood, minutes);
 
             if (!result.ok && result.reason === 'PREMIUM_REQUIRED') {
               Alert.alert(t('premium.requiredTitle'), t('premium.requiredBody'), [{ text: t('premium.cta') }]);
+              return;
+            }
+
+            if (!result.ok) {
+              Alert.alert(t('errors.relationshipStageRequiredTitle'), t('errors.relationshipStageRequiredBody'));
               return;
             }
 

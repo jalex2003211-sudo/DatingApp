@@ -39,6 +39,14 @@ export const EndScreen = ({ navigation, route }: Props) => {
 
   const toPhaseLabel = (phase: StageType) => `${phase.charAt(0).toUpperCase()}${phase.slice(1)}`;
 
+  const stageLabelByKey = {
+    new: t('relationshipStage.option.breakIce'),
+    dating: t('relationshipStage.option.newDating'),
+    longTerm: t('relationshipStage.option.longTerm'),
+    married: t('relationshipStage.option.married'),
+    reconnecting: t('relationshipStage.option.reconnecting')
+  } as const;
+
   const getAdaptiveReflection = () => {
     if (peakPhaseReached === 'intimate') {
       return t('end.reflectionIntimate');
@@ -77,7 +85,7 @@ export const EndScreen = ({ navigation, route }: Props) => {
 
       <Text style={styles.stat}>{`${t('end.durationPlayed')}: ${formatCountdown(durationPlayed)}`}</Text>
       <Text style={styles.stat}>{`${t('end.mood')}: ${resolvedMood ? t(`mood.${resolvedMood}`) : '-'}`}</Text>
-      <Text style={styles.stat}>{`${t('end.relationshipStage')}: ${resolvedStage}`}</Text>
+      <Text style={styles.stat}>{`${t('end.relationshipStage')}: ${resolvedStage ? stageLabelByKey[resolvedStage] : '-'}`}</Text>
       <Text style={styles.stat}>{`${t('end.peakPhase')}: ${toPhaseLabel(peakPhaseReached)}`}</Text>
       <Text style={styles.stat}>{`${t('end.avgIntensity')}: ${avgIntensity.toFixed(1)}`}</Text>
       <Text style={styles.reflection}>{reflectionMessage ?? getAdaptiveReflection()}</Text>

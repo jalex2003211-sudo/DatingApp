@@ -13,6 +13,8 @@ import i18n from './src/i18n';
 import { usePrefsStore } from './src/state/prefsStore';
 import { ChooseDurationScreen } from './src/screens/ChooseDurationScreen';
 import { ChooseMoodScreen } from './src/screens/ChooseMoodScreen';
+import { ChooseRelationshipStageScreen } from './src/screens/ChooseRelationshipStageScreen';
+import { ChooseRolesScreen } from './src/screens/ChooseRolesScreen';
 import { EndScreen } from './src/screens/EndScreen';
 import { FavoritesScreen } from './src/screens/FavoritesScreen';
 import { GameScreen } from './src/screens/GameScreen';
@@ -37,6 +39,8 @@ export default function App() {
           <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Splash">
             <Stack.Screen name="Splash" component={SplashScreen} />
             <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="ChooseRelationshipStage" component={ChooseRelationshipStageScreen} />
+            <Stack.Screen name="ChooseRoles" component={ChooseRolesScreen} />
             <Stack.Screen name="ChooseMood" component={ChooseMoodScreen} />
             <Stack.Screen name="ChooseDuration" component={ChooseDurationScreen} />
             <Stack.Screen name="Game" component={GameScreen} />

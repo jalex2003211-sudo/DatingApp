@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { QuestionCard } from '../components/QuestionCard';
 import { getSessionQuestionsForMood } from '../engine/normalizeQuestions';
 import { usePrefsStore } from '../state/prefsStore';
-import { FavoriteLikedBy, useFavoritesStore } from '../state/favoritesStore';
+import { FavoriteLikedBy, useFavoritesStore, useFavoriteMeta, useIsFavorite } from '../state/favoritesStore';
 import { useSessionStore } from '../state/sessionStore';
 import { RootStackParamList } from '../types';
 import { getActiveSpeakerGender } from '../utils/getActiveSpeakerGender';
@@ -54,7 +54,6 @@ export const GameScreen = ({ navigation }: Props) => {
 
   const activeTheme = getActiveThemeTokens();
 
-  const isFavorite = useFavoritesStore((s) => s.isFavorite);
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
 
   const normalizedDeck = useMemo(() => {
@@ -95,7 +94,8 @@ export const GameScreen = ({ navigation }: Props) => {
     }
   }, [completed, currentQuestionId, endReason, navigation]);
 
-  const favorite = currentQuestion ? isFavorite(currentQuestion.id) : false;
+  const favorite = useIsFavorite(currentQuestion?.id);
+  const favoriteMeta = useFavoriteMeta(currentQuestion?.id);
   const [debugVisible, setDebugVisible] = useState(false);
 
   const translate = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -188,9 +188,9 @@ export const GameScreen = ({ navigation }: Props) => {
   const onSwipeRightFavNext = useCallback(() => {
     if (!currentQuestion) return;
 
-    toggleCurrentQuestionFavorite(currentQuestion.id, favorite);
+    toggleCurrentQuestionFavorite(currentQuestion.id, Boolean(favoriteMeta));
     animateOffAndThen(width * 1.1, 0, () => nextCard());
-  }, [animateOffAndThen, currentQuestion, favorite, nextCard, toggleCurrentQuestionFavorite, width]);
+  }, [animateOffAndThen, currentQuestion, favoriteMeta, nextCard, toggleCurrentQuestionFavorite, width]);
 
   const onSwipeUpSkip = useCallback(() => {
     animateOffAndThen(0, -height * 0.6, () => skipCard());
@@ -354,7 +354,7 @@ export const GameScreen = ({ navigation }: Props) => {
             if (__DEV__) {
               console.log('[fav] press', { id: currentQuestion?.id, lang: language });
             }
-            toggleCurrentQuestionFavorite(currentQuestion.id, favorite);
+            toggleCurrentQuestionFavorite(currentQuestion.id, Boolean(favoriteMeta));
           }}
         >
           <Text style={[styles.sessionHeartText, { color: activeTheme.heart }]}>{favorite ? '♥' : '♡'}</Text>

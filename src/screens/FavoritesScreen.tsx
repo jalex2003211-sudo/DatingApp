@@ -73,6 +73,12 @@ export const FavoritesScreen = ({ navigation }: Props) => {
     if (result.ok) navigation.navigate('Game');
   };
 
+  const getPartnerName = (partnerId: 'A' | 'B') => {
+    const fallback = partnerId === 'A' ? 'Partner A' : 'Partner B';
+    const partner = partnerId === 'A' ? profile?.partnerA : profile?.partnerB;
+    return partner?.name?.trim() || fallback;
+  };
+
   const noFavorites = favoriteItems.length === 0;
 
   return (
@@ -107,7 +113,7 @@ export const FavoritesScreen = ({ navigation }: Props) => {
               <View style={styles.topRow}>
                 <View style={styles.likedByPill}>
                   <View style={[styles.badgeDot, { backgroundColor: accent }]} />
-                  <Text style={styles.likedByText}>{t(`favorites.likedBy.${likedBy}`)}</Text>
+                  <Text style={styles.likedByText}>{`♥ ${getPartnerName(likedBy)}`}</Text>
                 </View>
                 <View style={[styles.moodPill, { borderColor: moodChipColor[question.mood] }]}>
                   <Text style={[styles.moodText, { color: moodChipColor[question.mood] }]}>{t(`mood.${question.mood}`)}</Text>

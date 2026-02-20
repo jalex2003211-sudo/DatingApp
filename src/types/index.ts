@@ -39,7 +39,8 @@ export type RootStackParamList = {
   ChooseMood: undefined;
   ChooseDuration: { mood: Mood };
   Game: undefined;
-  End: undefined;
+  End: { reason?: 'TIME_UP' | 'DECK_EXHAUSTED' | 'USER_ENDED' } | undefined;
   Favorites: undefined;
+  Premium: undefined;
   Settings: undefined;
 };

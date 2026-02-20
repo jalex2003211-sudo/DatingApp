@@ -4,31 +4,46 @@ import { useTranslation } from 'react-i18next';
 import { AppButton } from '../components/AppButton';
 import { useSessionStore } from '../state/sessionStore';
 import { RootStackParamList } from '../types';
+import { formatCountdown } from '../utils/time';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'End'>;
 
-export const EndScreen = ({ navigation }: Props) => {
+export const EndScreen = ({ navigation, route }: Props) => {
   const { t } = useTranslation();
-  const { mood, duration, stats, summary, startSession, resetSession } = useSessionStore();
+  const { mood, duration, relationshipStage, isPremium, summary, stats, lastSessionSummary, startSession, resetSession } = useSessionStore();
+
+  const reason = route.params?.reason ?? lastSessionSummary?.reason ?? 'USER_ENDED';
+  const viewed = lastSessionSummary?.viewed ?? stats.viewed;
+  const skipped = lastSessionSummary?.skipped ?? stats.skipped;
+  const favoritesAdded = lastSessionSummary?.favoritesAdded ?? stats.favoritesAdded;
+  const durationPlayed = lastSessionSummary?.durationPlayed ?? 0;
+  const resolvedMood = lastSessionSummary?.mood ?? mood;
+  const resolvedStage = lastSessionSummary?.relationshipStage ?? relationshipStage;
+  const avgIntensity = lastSessionSummary?.avgIntensity ?? summary?.averageIntensity ?? stats.averageIntensity;
+  const reflectionMessage = lastSessionSummary?.reflectionMessage ?? summary?.reflectionMessage;
+
+  const title = reason === 'DECK_EXHAUSTED' ? t('end.deckExhaustedTitle') : t('end.title');
+  const subtitle = reason === 'DECK_EXHAUSTED' ? t('end.deckExhaustedSubtitle') : t('end.message');
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{t('end.title')}</Text>
-      <Text style={styles.message}>{t('end.message')}</Text>
-      <Text style={styles.stat}>{`${t('end.viewed')}: ${stats.viewed}`}</Text>
-      <Text style={styles.stat}>{`${t('end.skipped')}: ${stats.skipped}`}</Text>
-      <Text style={styles.stat}>{`${t('end.favorites')}: ${stats.favoritesAdded}`}</Text>
+      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.message}>{subtitle}</Text>
 
-      <Text style={styles.stat}>{`Peak phase: ${summary?.peakPhase ?? stats.peakPhase}`}</Text>
-      <Text style={styles.stat}>{`Avg intensity: ${summary?.averageIntensity ?? stats.averageIntensity}`}</Text>
-      <Text style={styles.stat}>{`Safety level: ${summary?.safetyLevel ?? stats.safetyLevel}`}</Text>
-      {summary?.reflectionMessage ? <Text style={styles.reflection}>{summary.reflectionMessage}</Text> : null}
+      <Text style={styles.stat}>{`${t('end.viewed')}: ${viewed}`}</Text>
+      <Text style={styles.stat}>{`${t('end.skipped')}: ${skipped}`}</Text>
+      <Text style={styles.stat}>{`${t('end.favorites')}: ${favoritesAdded}`}</Text>
+      <Text style={styles.stat}>{`${t('end.durationPlayed')}: ${formatCountdown(durationPlayed)}`}</Text>
+      <Text style={styles.stat}>{`${t('end.mood')}: ${resolvedMood ? t(`mood.${resolvedMood}`) : '-'}`}</Text>
+      <Text style={styles.stat}>{`${t('end.relationshipStage')}: ${resolvedStage}`}</Text>
+      <Text style={styles.stat}>{`${t('end.avgIntensity')}: ${avgIntensity.toFixed(2)}`}</Text>
+      {reflectionMessage ? <Text style={styles.reflection}>{reflectionMessage}</Text> : null}
 
       <AppButton
-        label={t('end.playAgain')}
+        label={t('end.replaySameSettings')}
         onPress={() => {
-          if (mood) {
-            const result = startSession(mood, duration);
+          if (resolvedMood) {
+            const result = startSession(resolvedMood, duration);
 
             if (!result.ok && result.reason === 'PREMIUM_REQUIRED') {
               Alert.alert(t('premium.requiredTitle'), t('premium.requiredBody'), [{ text: t('premium.cta') }]);
@@ -41,6 +56,7 @@ export const EndScreen = ({ navigation }: Props) => {
           }
         }}
       />
+      <AppButton label={t('end.changeMood')} variant="secondary" onPress={() => navigation.replace('ChooseMood')} />
       <AppButton
         label={t('end.home')}
         variant="secondary"
@@ -49,14 +65,16 @@ export const EndScreen = ({ navigation }: Props) => {
           navigation.navigate('Home');
         }}
       />
-      <AppButton label={t('end.favorites')} variant="secondary" onPress={() => navigation.navigate('Favorites')} />
+      {!isPremium ? (
+        <AppButton label={t('end.unlockMoreDecks')} variant="secondary" onPress={() => navigation.navigate('Premium')} />
+      ) : null}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#111827', padding: 24, justifyContent: 'center' },
-  title: { color: '#F9FAFB', fontSize: 32, fontWeight: '700', marginBottom: 8 },
+  title: { color: '#F9FAFB', fontSize: 30, fontWeight: '700', marginBottom: 8 },
   message: { color: '#D1D5DB', fontSize: 16, marginBottom: 18 },
   stat: { color: '#E5E7EB', fontSize: 16, marginBottom: 4 },
   reflection: { color: '#C7D2FE', fontSize: 15, marginTop: 12, marginBottom: 14, lineHeight: 22 }

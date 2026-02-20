@@ -42,7 +42,7 @@ export const GameScreen = ({ navigation }: Props) => {
     activeSpeakerRole,
     partnerA,
     partnerB,
-    isDeckExhausted,
+    completed,
     endReason,
     nextCard,
     skipCard,
@@ -84,11 +84,16 @@ export const GameScreen = ({ navigation }: Props) => {
     }
   }, [timerSecondsLeft, navigation, endReason, endSession]);
 
+  const previousQuestionIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (isDeckExhausted) {
-      navigation.replace('End', { reason: 'DECK_EXHAUSTED' });
+    const previousQuestionId = previousQuestionIdRef.current;
+    previousQuestionIdRef.current = currentQuestionId;
+
+    if (previousQuestionId && currentQuestionId === null && completed) {
+      navigation.replace('End', { reason: endReason ?? 'DECK_EXHAUSTED' });
     }
-  }, [isDeckExhausted, navigation]);
+  }, [completed, currentQuestionId, endReason, navigation]);
 
   const favorite = currentQuestion ? isFavorite(currentQuestion.id) : false;
   const [debugVisible, setDebugVisible] = useState(false);
@@ -160,10 +165,15 @@ export const GameScreen = ({ navigation }: Props) => {
 
   const toggleCurrentQuestionFavorite = useCallback((questionId: string, alreadyFavorite: boolean) => {
     if (__DEV__) {
-      console.log('[favorites] toggle', { id: questionId, language, alreadyFavorite });
+      console.log('[fav] toggle', { id: questionId, language, alreadyFavorite });
     }
 
-    if (!questionId) return;
+    if (!questionId) {
+      if (__DEV__) {
+        console.warn('[fav] toggle skipped: missing question id');
+      }
+      return;
+    }
 
     if (!alreadyFavorite) {
       const likedBy: FavoriteLikedBy = getActiveSpeakerGender(activeSpeakerRole, partnerA, partnerB);
@@ -278,7 +288,7 @@ export const GameScreen = ({ navigation }: Props) => {
   if (!currentQuestion) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>{isDeckExhausted ? t('end.deckExhaustedTitle') : t('loading')}</Text>
+        <Text style={styles.title}>{t('loading')}</Text>
       </View>
     );
   }
@@ -340,7 +350,12 @@ export const GameScreen = ({ navigation }: Props) => {
 
         <Pressable
           style={styles.sessionHeartButton}
-          onPress={() => toggleCurrentQuestionFavorite(currentQuestion.id, favorite)}
+          onPress={() => {
+            if (__DEV__) {
+              console.log('[fav] press', { id: currentQuestion?.id, lang: language });
+            }
+            toggleCurrentQuestionFavorite(currentQuestion.id, favorite);
+          }}
         >
           <Text style={[styles.sessionHeartText, { color: activeTheme.heart }]}>{favorite ? '♥' : '♡'}</Text>
         </Pressable>

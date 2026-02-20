@@ -65,12 +65,41 @@ const toFavoriteEntry = (value: unknown): FavoriteEntry | null => {
   };
 };
 
+const normalizeRawFavorites = (rawValues: unknown): unknown[] => {
+  if (Array.isArray(rawValues)) return rawValues;
+
+  if (rawValues instanceof Set) {
+    return Array.from(rawValues.values());
+  }
+
+  if (rawValues && typeof rawValues === 'object') {
+    const setLikeValues = (rawValues as { values?: unknown }).values;
+
+    if (typeof setLikeValues === 'function') {
+      try {
+        return Array.from((setLikeValues as () => Iterable<unknown>)());
+      } catch {
+        return [];
+      }
+    }
+
+    if ('items' in rawValues && Array.isArray((rawValues as { items?: unknown[] }).items)) {
+      return (rawValues as { items: unknown[] }).items;
+    }
+
+    return Object.values(rawValues as Record<string, unknown>);
+  }
+
+  return [];
+};
+
 const normalizeEntries = (rawValues: unknown): FavoriteEntry[] => {
-  if (!Array.isArray(rawValues)) return [];
+  const listValues = normalizeRawFavorites(rawValues);
+  if (!listValues.length) return [];
 
   const unique = new Map<string, FavoriteEntry>();
 
-  rawValues.forEach((value, index) => {
+  listValues.forEach((value, index) => {
     const entry = toFavoriteEntry(value);
     if (!entry) return;
     unique.set(entry.id, {
@@ -87,8 +116,17 @@ export const useFavoritesStore = create<FavoritesState>()(
     (set, get) => ({
       favorites: [],
       toggleFavorite: (questionId, likedBy = 'neutral') => {
-        if (!questionId) return;
+        if (!questionId) {
+          if (__DEV__) {
+            console.warn('[fav] toggle skipped: invalid id', { id: questionId });
+          }
+          return;
+        }
         const exists = get().favorites.some((favorite) => favorite.id === questionId);
+
+        if (__DEV__) {
+          console.log('[fav] toggle', { id: questionId, existsBefore: exists, likedByFinal: likedBy ?? 'neutral' });
+        }
 
         set({
           favorites: exists
@@ -110,9 +148,37 @@ export const useFavoritesStore = create<FavoritesState>()(
       migrate: (persistedState) => {
         const state = (persistedState ?? {}) as LegacyFavoriteState;
         const rawFavorites = state.favorites ?? state.favoriteIds;
+
+        const migratedFavorites = normalizeEntries(rawFavorites);
+
+        if (__DEV__ && rawFavorites && migratedFavorites.length === 0) {
+          console.warn('[fav] migration produced empty favorites from persisted payload', { rawFavorites });
+        }
+
         return {
-          favorites: normalizeEntries(rawFavorites)
+          favorites: migratedFavorites
         };
+      },
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          if (__DEV__) {
+            console.warn('[fav] rehydrate failed; resetting favorites', { error });
+          }
+          state?.clearFavorites();
+          return;
+        }
+
+        if (!state) return;
+
+        if (!Array.isArray(state.favorites)) {
+          if (__DEV__) {
+            console.warn('[fav] invalid favorites state after rehydrate; resetting');
+          }
+          state.clearFavorites();
+          return;
+        }
+
+        state.favorites = normalizeEntries(state.favorites);
       }
     }
   )

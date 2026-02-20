@@ -48,6 +48,8 @@ type SessionState = {
   timerSecondsLeft: number;
   currentQuestionId: string | null;
   nextQuestionId: string | null;
+  sessionQueue: string[];
+  queueIndex: number;
   questionsShown: string[];
   currentPhase: StageType;
   targetIntensity: number;
@@ -98,6 +100,8 @@ const initialState = {
   timerSecondsLeft: minutesToSeconds(10),
   currentQuestionId: null,
   nextQuestionId: null,
+  sessionQueue: [] as string[],
+  queueIndex: 0,
   questionsShown: [] as string[],
   currentPhase: 'warmup' as StageType,
   targetIntensity: 2,
@@ -120,6 +124,26 @@ const initialState = {
 };
 
 let activeJourneySession: EmotionalJourneySession | null = null;
+
+
+const buildSessionQueue = (questions: Question[]): string[] => {
+  const seen = new Set<string>();
+  return questions
+    .map((question) => question?.id)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    .filter((id) => {
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+};
+
+const getQueuePatch = (queue: string[], queueIndex: number) => ({
+  queueIndex,
+  currentQuestionId: queue[queueIndex] ?? null,
+  nextQuestionId: queue[queueIndex + 1] ?? null,
+  isDeckExhausted: queue.length === 0
+});
 
 const patchFromSnapshot = (snapshot: JourneySnapshot) => ({
   currentQuestionId: snapshot.currentQuestion?.id ?? null,
@@ -193,6 +217,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       return invalidStateResult;
     }
 
+    const sessionQueue = buildSessionQueue(questions);
+
+    if (__DEV__) {
+      console.assert(sessionQueue.length > 0, '[session] startSession created an empty queue');
+      console.log('[session] queue initialized', { total: sessionQueue.length });
+    }
+
     set({
       mood,
       duration,
@@ -201,11 +232,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       completed: false,
       summary: null,
       sessionSummary: null,
-      isDeckExhausted: false,
       endReason: null,
       lastError: null,
       activeSpeakerRole: 'A',
-      ...patchFromSnapshot(snapshot)
+      ...patchFromSnapshot(snapshot),
+      sessionQueue,
+      questionsShown: [],
+      ...getQueuePatch(sessionQueue, 0)
     });
 
     return result;
@@ -235,32 +268,76 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     return get().startSession('FUN', duration, favoriteQuestions);
   },
   nextCard: () => {
-    if (!activeJourneySession) return;
-    const snapshot = activeJourneySession.next();
-    const patch = patchFromSnapshot(snapshot);
+    const currentState = get();
+    const { currentQuestionId, queueIndex, sessionQueue } = currentState;
+
+    if (!currentQuestionId) {
+      if (__DEV__) {
+        console.warn('[session] nextCard skipped: missing currentQuestionId');
+      }
+      return;
+    }
+
+    const snapshot = activeJourneySession?.next();
+    const journeyPatch = snapshot ? patchFromSnapshot(snapshot) : {};
+    const shownQuestionIds = currentState.questionsShown.includes(currentQuestionId)
+      ? currentState.questionsShown
+      : [...currentState.questionsShown, currentQuestionId];
+
+    const nextIndex = queueIndex + 1;
+    const hasNextCard = nextIndex < sessionQueue.length;
 
     set((state) => ({
-      ...patch,
-      activeSpeakerRole: state.activeSpeakerRole === 'A' ? 'B' : 'A',
-      isDeckExhausted: snapshot.remainingQuestionsCount <= 0 || patch.currentQuestionId === null
+      ...journeyPatch,
+      questionsShown: shownQuestionIds,
+      sessionQueue,
+      ...(hasNextCard ? getQueuePatch(sessionQueue, nextIndex) : {
+        queueIndex,
+        currentQuestionId: null,
+        nextQuestionId: null,
+        isDeckExhausted: true
+      }),
+      activeSpeakerRole: state.activeSpeakerRole === 'A' ? 'B' : 'A'
     }));
 
-    if (snapshot.remainingQuestionsCount <= 0 || patch.currentQuestionId === null) {
+    if (!hasNextCard) {
       get().endSession({ reason: 'DECK_EXHAUSTED' });
     }
   },
   skipCard: () => {
-    if (!activeJourneySession) return;
-    const snapshot = activeJourneySession.skip();
-    const patch = patchFromSnapshot(snapshot);
+    const currentState = get();
+    const { currentQuestionId, queueIndex, sessionQueue } = currentState;
+
+    if (!currentQuestionId) {
+      if (__DEV__) {
+        console.warn('[session] skipCard skipped: missing currentQuestionId');
+      }
+      return;
+    }
+
+    const snapshot = activeJourneySession?.skip();
+    const journeyPatch = snapshot ? patchFromSnapshot(snapshot) : {};
+    const shownQuestionIds = currentState.questionsShown.includes(currentQuestionId)
+      ? currentState.questionsShown
+      : [...currentState.questionsShown, currentQuestionId];
+
+    const nextIndex = queueIndex + 1;
+    const hasNextCard = nextIndex < sessionQueue.length;
 
     set((state) => ({
-      ...patch,
-      activeSpeakerRole: state.activeSpeakerRole === 'A' ? 'B' : 'A',
-      isDeckExhausted: snapshot.remainingQuestionsCount <= 0 || patch.currentQuestionId === null
+      ...journeyPatch,
+      questionsShown: shownQuestionIds,
+      sessionQueue,
+      ...(hasNextCard ? getQueuePatch(sessionQueue, nextIndex) : {
+        queueIndex,
+        currentQuestionId: null,
+        nextQuestionId: null,
+        isDeckExhausted: true
+      }),
+      activeSpeakerRole: state.activeSpeakerRole === 'A' ? 'B' : 'A'
     }));
 
-    if (snapshot.remainingQuestionsCount <= 0 || patch.currentQuestionId === null) {
+    if (!hasNextCard) {
       get().endSession({ reason: 'DECK_EXHAUSTED' });
     }
   },
@@ -273,7 +350,16 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   registerFavoriteAdded: () => {
     if (!activeJourneySession) return;
     const snapshot = activeJourneySession.favorite();
-    set({ ...patchFromSnapshot(snapshot) });
+    const patch = patchFromSnapshot(snapshot);
+    set((state) => ({
+      ...patch,
+      currentQuestionId: state.currentQuestionId,
+      nextQuestionId: state.nextQuestionId,
+      questionsShown: state.questionsShown,
+      sessionQueue: state.sessionQueue,
+      queueIndex: state.queueIndex,
+      isDeckExhausted: state.isDeckExhausted
+    }));
   },
   endSession: ({ reason = 'USER_ENDED' } = {}) => {
     const currentState = get();

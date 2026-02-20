@@ -4,7 +4,7 @@ import { DEFAULT_RELATIONSHIP_PROFILE } from '../domain/profile/RelationshipProf
 import { SessionSummary } from '../domain/session/types';
 import { getSessionQuestionsForMood } from '../engine/normalizeQuestions';
 import { getThemeTokensByRole, RoleThemeTokens } from '../theme/roleTheme';
-import { Mood, PartnerProfile, PlayerRole, RelationshipStage, StageType } from '../types';
+import { Mood, PartnerProfile, PlayerRole, Question, RelationshipStage, StageType } from '../types';
 import { minutesToSeconds } from '../utils/time';
 
 export type SessionEndReason = 'TIME_UP' | 'DECK_EXHAUSTED' | 'USER_ENDED';
@@ -72,7 +72,8 @@ type SessionState = {
   setActiveSpeakerRole: (role: PlayerRole) => void;
   getActiveThemeTokens: () => RoleThemeTokens;
   toggleActiveSpeakerRole: () => void;
-  startSession: (mood: Mood, duration: number) => StartSessionResult;
+  startSession: (mood: Mood, duration: number, overrideQuestions?: Question[]) => StartSessionResult;
+  startFavoritesSession: (favoriteQuestions: Question[], duration?: number) => StartSessionResult;
   nextCard: () => void;
   skipCard: () => void;
   tick: () => void;
@@ -149,7 +150,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
   toggleActiveSpeakerRole: () =>
     set((state) => ({ activeSpeakerRole: state.activeSpeakerRole === 'A' ? 'B' : 'A' })),
-  startSession: (mood, duration) => {
+  startSession: (mood, duration, overrideQuestions) => {
     const relationshipStage = get().relationshipStage;
     if (!relationshipStage) {
       const invalidStateResult: StartSessionResult = {
@@ -161,7 +162,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       return invalidStateResult;
     }
 
-    const questions = getSessionQuestionsForMood(mood, relationshipStage);
+    const questions = overrideQuestions && overrideQuestions.length > 0
+      ? overrideQuestions
+      : getSessionQuestionsForMood(mood, relationshipStage);
     activeJourneySession = new EmotionalJourneySession({
       mood,
       isPremium: get().isPremium,
@@ -206,6 +209,30 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     });
 
     return result;
+  },
+  startFavoritesSession: (favoriteQuestions, duration = 10) => {
+    const relationshipStage = get().relationshipStage;
+    if (!relationshipStage) {
+      const invalidStateResult: StartSessionResult = {
+        ok: false,
+        reason: 'INVALID_STATE',
+        message: 'Relationship stage is required before starting a session.'
+      };
+      set({ lastError: 'MISSING_RELATIONSHIP_STAGE' });
+      return invalidStateResult;
+    }
+
+    if (!favoriteQuestions.length) {
+      const invalidStateResult: StartSessionResult = {
+        ok: false,
+        reason: 'INVALID_STATE',
+        message: 'Favorites session requires at least one question.'
+      };
+      set({ lastError: invalidStateResult.reason });
+      return invalidStateResult;
+    }
+
+    return get().startSession('FUN', duration, favoriteQuestions);
   },
   nextCard: () => {
     if (!activeJourneySession) return;

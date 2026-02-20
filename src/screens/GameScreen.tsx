@@ -14,10 +14,11 @@ import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 import { QuestionCard } from '../components/QuestionCard';
 import { getSessionQuestionsForMood } from '../engine/normalizeQuestions';
-import { useFavoritesStore } from '../state/favoritesStore';
 import { usePrefsStore } from '../state/prefsStore';
+import { FavoriteLikedBy, useFavoritesStore } from '../state/favoritesStore';
 import { useSessionStore } from '../state/sessionStore';
 import { RootStackParamList } from '../types';
+import { getActiveSpeakerGender } from '../utils/getActiveSpeakerGender';
 import { formatCountdown } from '../utils/time';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
@@ -157,14 +158,29 @@ export const GameScreen = ({ navigation }: Props) => {
     animateOffAndThen(-width * 1.1, 0, () => nextCard());
   }, [animateOffAndThen, nextCard, width]);
 
+  const toggleCurrentQuestionFavorite = useCallback((questionId: string, alreadyFavorite: boolean) => {
+    if (__DEV__) {
+      console.log('[favorites] toggle', { id: questionId, language, alreadyFavorite });
+    }
+
+    if (!questionId) return;
+
+    if (!alreadyFavorite) {
+      const likedBy: FavoriteLikedBy = getActiveSpeakerGender(activeSpeakerRole, partnerA, partnerB);
+      registerFavoriteAdded();
+      toggleFavorite(questionId, likedBy);
+      return;
+    }
+
+    toggleFavorite(questionId);
+  }, [activeSpeakerRole, language, partnerA, partnerB, registerFavoriteAdded, toggleFavorite]);
+
   const onSwipeRightFavNext = useCallback(() => {
     if (!currentQuestion) return;
 
-    if (!favorite) registerFavoriteAdded();
-    if (!favorite) toggleFavorite(currentQuestion.id);
-
+    toggleCurrentQuestionFavorite(currentQuestion.id, favorite);
     animateOffAndThen(width * 1.1, 0, () => nextCard());
-  }, [animateOffAndThen, currentQuestion, favorite, nextCard, registerFavoriteAdded, toggleFavorite, width]);
+  }, [animateOffAndThen, currentQuestion, favorite, nextCard, toggleCurrentQuestionFavorite, width]);
 
   const onSwipeUpSkip = useCallback(() => {
     animateOffAndThen(0, -height * 0.6, () => skipCard());
@@ -324,10 +340,7 @@ export const GameScreen = ({ navigation }: Props) => {
 
         <Pressable
           style={styles.sessionHeartButton}
-          onPress={() => {
-            if (!favorite) registerFavoriteAdded();
-            toggleFavorite(currentQuestion.id);
-          }}
+          onPress={() => toggleCurrentQuestionFavorite(currentQuestion.id, favorite)}
         >
           <Text style={[styles.sessionHeartText, { color: activeTheme.heart }]}>{favorite ? '♥' : '♡'}</Text>
         </Pressable>

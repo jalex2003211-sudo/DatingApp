@@ -83,6 +83,19 @@ export const resources = {
         home: 'Home'
       },
       favoritesTitle: 'Favorites',
+      favorites: {
+        playFavorites: 'Play Favorites',
+        filter: {
+          all: 'All',
+          male: 'Male',
+          female: 'Female'
+        },
+        likedBy: {
+          male: 'Liked by male',
+          female: 'Liked by female',
+          neutral: 'Liked by neutral'
+        }
+      },
       noFavorites: 'No favorites yet.',
       remove: 'Remove',
       settingsTitle: 'Settings',
@@ -182,6 +195,19 @@ export const resources = {
         home: 'Αρχική'
       },
       favoritesTitle: 'Αγαπημένες',
+      favorites: {
+        playFavorites: 'Παίξε Αγαπημένα',
+        filter: {
+          all: 'Όλα',
+          male: 'Άνδρας',
+          female: 'Γυναίκα'
+        },
+        likedBy: {
+          male: 'Like από άνδρα',
+          female: 'Like από γυναίκα',
+          neutral: 'Like από ουδέτερο'
+        }
+      },
       noFavorites: 'Δεν υπάρχουν αγαπημένες ακόμη.',
       remove: 'Αφαίρεση',
       settingsTitle: 'Ρυθμίσεις',

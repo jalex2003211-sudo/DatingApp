@@ -27,12 +27,14 @@ export const resources = {
       gender: {
         male: 'Male',
         female: 'Female',
-        neutral: 'Neutral'
+        neutral: 'Neutral',
+        custom: 'Custom'
       },
       genderLabel: {
         male: 'Male',
         female: 'Female',
-        neutral: 'Neutral'
+        neutral: 'Neutral',
+        custom: 'Custom'
       },
       mood: {
         FUN: 'Fun',
@@ -87,17 +89,30 @@ export const resources = {
         playFavorites: 'Play Favorites',
         filter: {
           all: 'All',
-          male: 'Male',
-          female: 'Female'
+          A: 'Partner A',
+          B: 'Partner B'
         },
         likedBy: {
-          male: 'Liked by male',
-          female: 'Liked by female',
-          neutral: 'Liked by neutral'
+          A: 'Partner A',
+          B: 'Partner B'
         }
       },
       noFavorites: 'No favorites yet.',
       remove: 'Remove',
+      profile: {
+        title: 'Set up your profile',
+        partnerA: 'Partner A',
+        partnerB: 'Partner B',
+        name: 'Name',
+        gender: 'Gender',
+        male: 'Male',
+        female: 'Female',
+        custom: 'Custom',
+        addPhoto: 'Add photo',
+        continue: 'Continue',
+        save: 'Save',
+        editProfile: 'Edit Profile'
+      },
       settingsTitle: 'Settings',
       loading: 'Loading...',
       language: 'Language',
@@ -139,12 +154,14 @@ export const resources = {
       gender: {
         male: 'Άνδρας',
         female: 'Γυναίκα',
-        neutral: 'Ουδέτερο'
+        neutral: 'Ουδέτερο',
+        custom: 'Προσαρμοσμένο'
       },
       genderLabel: {
         male: 'Άνδρας',
         female: 'Γυναίκα',
-        neutral: 'Ουδέτερο'
+        neutral: 'Ουδέτερο',
+        custom: 'Προσαρμοσμένο'
       },
       mood: {
         FUN: 'Διασκεδαστική',
@@ -199,17 +216,30 @@ export const resources = {
         playFavorites: 'Παίξε Αγαπημένα',
         filter: {
           all: 'Όλα',
-          male: 'Άνδρας',
-          female: 'Γυναίκα'
+          A: 'Partner A',
+          B: 'Partner B'
         },
         likedBy: {
-          male: 'Like από άνδρα',
-          female: 'Like από γυναίκα',
-          neutral: 'Like από ουδέτερο'
+          A: 'Partner A',
+          B: 'Partner B'
         }
       },
       noFavorites: 'Δεν υπάρχουν αγαπημένες ακόμη.',
       remove: 'Αφαίρεση',
+      profile: {
+        title: 'Ρύθμιση προφίλ',
+        partnerA: 'Partner A',
+        partnerB: 'Partner B',
+        name: 'Όνομα',
+        gender: 'Φύλο',
+        male: 'Άνδρας',
+        female: 'Γυναίκα',
+        custom: 'Προσαρμοσμένο',
+        addPhoto: 'Προσθήκη φωτογραφίας',
+        continue: 'Συνέχεια',
+        save: 'Αποθήκευση',
+        editProfile: 'Επεξεργασία προφίλ'
+      },
       settingsTitle: 'Ρυθμίσεις',
       loading: 'Φόρτωση...',
       language: 'Γλώσσα',

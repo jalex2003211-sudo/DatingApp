@@ -55,4 +55,5 @@ export type RootStackParamList = {
   Favorites: undefined;
   Premium: undefined;
   Settings: undefined;
+  ProfileSetup: undefined;
 };

@@ -2,17 +2,20 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useProfileStore } from '../state/profileStore';
 import { RootStackParamList } from '../types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 
 export const SplashScreen = ({ navigation }: Props) => {
   const { t } = useTranslation();
+  const hydrated = useProfileStore((s) => s.hydrated);
+  const profile = useProfileStore((s) => s.profile);
 
   useEffect(() => {
-    const timeout = setTimeout(() => navigation.replace('Home'), 1200);
-    return () => clearTimeout(timeout);
-  }, [navigation]);
+    if (!hydrated) return;
+    navigation.replace(profile ? 'Home' : 'ProfileSetup');
+  }, [hydrated, navigation, profile]);
 
   return (
     <View style={styles.container}>

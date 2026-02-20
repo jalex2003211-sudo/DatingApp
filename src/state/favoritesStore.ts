@@ -2,12 +2,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { getAllNormalizedQuestions } from '../engine/normalizeQuestions';
+import { UserProfile } from '../types/profile';
 
-export type FavoriteLikedBy = 'male' | 'female' | 'neutral';
+export type FavoriteLikedBy = 'A' | 'B';
+type LegacyFavoriteLikedBy = 'male' | 'female' | 'neutral';
+
+type AnyFavoriteLikedBy = FavoriteLikedBy | LegacyFavoriteLikedBy;
 
 export type FavoriteEntry = {
   id: string;
-  likedBy: FavoriteLikedBy;
+  likedBy: AnyFavoriteLikedBy;
   createdAt: number;
 };
 
@@ -24,13 +28,11 @@ type FavoritesState = {
   ensureFavorite: (questionId: string, likedBy: FavoriteLikedBy) => void;
   toggleFavorite: (questionId: string, likedBy?: FavoriteLikedBy) => void;
   removeFavorite: (questionId: string) => void;
-  isFavorite: (questionId: string) => boolean;
-  getFavoriteEntry: (questionId: string) => FavoriteEntry | null;
-  listFavorites: () => FavoriteEntry[];
+  migrateLegacyLikedBy: (profile: UserProfile) => void;
   clearFavorites: () => void;
 };
 
-const FAVORITES_STORAGE_VERSION = 3;
+const FAVORITES_STORAGE_VERSION = 4;
 
 const questionTextToIdMap = new Map<string, string>(
   getAllNormalizedQuestions().flatMap((question) => [
@@ -40,11 +42,23 @@ const questionTextToIdMap = new Map<string, string>(
   ])
 );
 
+const resolveLegacyLikedBy = (likedBy: AnyFavoriteLikedBy, profile: UserProfile): FavoriteLikedBy => {
+  if (likedBy === 'A' || likedBy === 'B') return likedBy;
+
+  if (likedBy === 'male' || likedBy === 'female') {
+    if (profile.partnerA.gender === likedBy) return 'A';
+    if (profile.partnerB.gender === likedBy) return 'B';
+    return 'A';
+  }
+
+  return 'A';
+};
+
 const toFavoriteEntry = (value: unknown): FavoriteEntry | null => {
   if (typeof value === 'string') {
     const mappedId = questionTextToIdMap.get(value);
     if (!mappedId) return null;
-    return { id: mappedId, likedBy: 'neutral', createdAt: Date.now() };
+    return { id: mappedId, likedBy: 'A', createdAt: Date.now() };
   }
 
   if (!value || typeof value !== 'object') return null;
@@ -57,10 +71,14 @@ const toFavoriteEntry = (value: unknown): FavoriteEntry | null => {
   const mappedId = questionTextToIdMap.get(rawId);
   if (!mappedId) return null;
 
-  const likedBy: FavoriteLikedBy =
-    maybeEntry.likedBy === 'male' || maybeEntry.likedBy === 'female' || maybeEntry.likedBy === 'neutral'
+  const likedBy: AnyFavoriteLikedBy =
+    maybeEntry.likedBy === 'A' ||
+    maybeEntry.likedBy === 'B' ||
+    maybeEntry.likedBy === 'male' ||
+    maybeEntry.likedBy === 'female' ||
+    maybeEntry.likedBy === 'neutral'
       ? maybeEntry.likedBy
-      : 'neutral';
+      : 'A';
 
   return {
     id: mappedId,
@@ -71,29 +89,7 @@ const toFavoriteEntry = (value: unknown): FavoriteEntry | null => {
 
 const normalizeRawFavorites = (rawValues: unknown): unknown[] => {
   if (Array.isArray(rawValues)) return rawValues;
-
-  if (rawValues instanceof Set) {
-    return Array.from(rawValues.values());
-  }
-
-  if (rawValues && typeof rawValues === 'object') {
-    const setLikeValues = (rawValues as { values?: unknown }).values;
-
-    if (typeof setLikeValues === 'function') {
-      try {
-        return Array.from((setLikeValues as () => Iterable<unknown>)());
-      } catch {
-        return [];
-      }
-    }
-
-    if ('items' in rawValues && Array.isArray((rawValues as { items?: unknown[] }).items)) {
-      return (rawValues as { items: unknown[] }).items;
-    }
-
-    return Object.values(rawValues as Record<string, unknown>);
-  }
-
+  if (rawValues && typeof rawValues === 'object') return Object.values(rawValues as Record<string, unknown>);
   return [];
 };
 
@@ -121,24 +117,14 @@ const toFavoritesById = (entries: FavoriteEntry[]): FavoritesById =>
     return acc;
   }, {});
 
-const sortFavoriteEntries = (favoritesById: FavoritesById): FavoriteEntry[] =>
-  Object.values(favoritesById).sort((a, b) => b.createdAt - a.createdAt);
-
 export const useFavoritesStore = create<FavoritesState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       favoritesById: {},
       ensureFavorite: (questionId, likedBy) => {
-        if (!questionId) {
-          if (__DEV__) {
-            console.warn('[fav] ensure skipped: invalid id', { id: questionId });
-          }
-          return;
-        }
-
+        if (!questionId) return;
         set((state) => {
           if (state.favoritesById[questionId]) return state;
-
           return {
             favoritesById: {
               ...state.favoritesById,
@@ -151,18 +137,8 @@ export const useFavoritesStore = create<FavoritesState>()(
           };
         });
       },
-      toggleFavorite: (questionId, likedBy = 'neutral') => {
-        if (!questionId) {
-          if (__DEV__) {
-            console.warn('[fav] toggle skipped: invalid id', { id: questionId });
-          }
-          return;
-        }
-        const exists = Boolean(get().favoritesById[questionId]);
-
-        if (__DEV__) {
-          console.log('[fav] toggle', { id: questionId, existsBefore: exists, likedByFinal: likedBy ?? 'neutral' });
-        }
+      toggleFavorite: (questionId, likedBy = 'A') => {
+        if (!questionId) return;
 
         set((state) => {
           const nextFavoritesById = { ...state.favoritesById };
@@ -172,15 +148,13 @@ export const useFavoritesStore = create<FavoritesState>()(
           } else {
             nextFavoritesById[questionId] = {
               id: questionId,
-              likedBy: likedBy ?? 'neutral',
+              likedBy,
               createdAt: Date.now()
             };
           }
 
           return { favoritesById: nextFavoritesById };
         });
-
-        console.log('[fav] count', Object.keys(get().favoritesById).length);
       },
       removeFavorite: (questionId) =>
         set((state) => {
@@ -189,9 +163,15 @@ export const useFavoritesStore = create<FavoritesState>()(
           delete nextFavoritesById[questionId];
           return { favoritesById: nextFavoritesById };
         }),
-      isFavorite: (questionId) => Boolean(get().favoritesById[questionId]),
-      getFavoriteEntry: (questionId) => get().favoritesById[questionId] ?? null,
-      listFavorites: () => sortFavoriteEntries(get().favoritesById),
+      migrateLegacyLikedBy: (profile) =>
+        set((state) => {
+          const nextEntries = Object.values(state.favoritesById).map((entry) => ({
+            ...entry,
+            likedBy: resolveLegacyLikedBy(entry.likedBy, profile)
+          }));
+
+          return { favoritesById: toFavoritesById(nextEntries) };
+        }),
       clearFavorites: () => set({ favoritesById: {} })
     }),
     {
@@ -201,37 +181,9 @@ export const useFavoritesStore = create<FavoritesState>()(
       migrate: (persistedState) => {
         const state = (persistedState ?? {}) as LegacyFavoriteState;
         const rawFavorites = state.favoritesById ?? state.favorites ?? state.favoriteIds;
-
-        const migratedFavorites = normalizeEntries(rawFavorites);
-
-        if (__DEV__ && rawFavorites && migratedFavorites.length === 0) {
-          console.warn('[fav] migration produced empty favorites from persisted payload', { rawFavorites });
-        }
-
         return {
-          favoritesById: toFavoritesById(migratedFavorites)
+          favoritesById: toFavoritesById(normalizeEntries(rawFavorites))
         };
-      },
-      onRehydrateStorage: () => (state, error) => {
-        if (error) {
-          if (__DEV__) {
-            console.warn('[fav] rehydrate failed; resetting favorites', { error });
-          }
-          state?.clearFavorites();
-          return;
-        }
-
-        if (!state) return;
-
-        if (!state.favoritesById || typeof state.favoritesById !== 'object') {
-          if (__DEV__) {
-            console.warn('[fav] invalid favoritesById state after rehydrate; resetting');
-          }
-          state.clearFavorites();
-          return;
-        }
-
-        state.favoritesById = toFavoritesById(normalizeEntries(state.favoritesById));
       }
     }
   )

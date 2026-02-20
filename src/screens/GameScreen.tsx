@@ -16,6 +16,8 @@ import { QuestionCard } from '../components/QuestionCard';
 import { getAllNormalizedQuestions, getSessionQuestionsForMood } from '../engine/normalizeQuestions';
 import { usePrefsStore } from '../state/prefsStore';
 import { FavoriteLikedBy, useFavoritesStore, useFavoriteMeta, useIsFavorite } from '../state/favoritesStore';
+import { useProfileStore } from '../state/profileStore';
+import { buildAccentTokens, getAccentForPartner } from '../utils/accent';
 import { useSessionStore } from '../state/sessionStore';
 import { RootStackParamList } from '../types';
 import { formatCountdown } from '../utils/time';
@@ -40,19 +42,22 @@ export const GameScreen = ({ navigation }: Props) => {
     timerSecondsLeft,
     stats,
     activeSpeakerRole,
-    partnerA,
-    partnerB,
     completed,
     endReason,
     nextCard,
     skipCard,
     tick,
     endSession,
-    registerFavoriteAdded,
-    getActiveThemeTokens
+    registerFavoriteAdded
   } = useSessionStore();
 
-  const activeTheme = getActiveThemeTokens();
+  const profile = useProfileStore((s) => s.profile);
+
+  const activeTheme = useMemo(() => {
+    if (!profile) return { accent: "#A78BFA", heart: "#A78BFA", chipBg: "rgba(167,139,250,0.14)", borderGlow: "rgba(167,139,250,0.30)" };
+    const activePartner = activeSpeakerRole === "A" ? profile.partnerA : profile.partnerB;
+    return buildAccentTokens(getAccentForPartner(activePartner));
+  }, [activeSpeakerRole, profile]);
 
   const ensureFavorite = useFavoritesStore((s) => s.ensureFavorite);
 
@@ -168,17 +173,7 @@ export const GameScreen = ({ navigation }: Props) => {
   const actionLock = useRef(false);
 
   const isPartnerATurn = questionsShown.length % 2 === 0;
-  const actorGender: FavoriteLikedBy = isPartnerATurn
-    ? partnerA.gender === 'MALE'
-      ? 'male'
-      : partnerA.gender === 'FEMALE'
-        ? 'female'
-        : 'neutral'
-    : partnerB.gender === 'MALE'
-      ? 'male'
-      : partnerB.gender === 'FEMALE'
-        ? 'female'
-        : 'neutral';
+  const actorGender: FavoriteLikedBy = isPartnerATurn ? 'A' : 'B';
 
   const onSwipeLeftNext = useCallback(() => {
     if (actionLock.current) return;
@@ -326,18 +321,8 @@ export const GameScreen = ({ navigation }: Props) => {
     hapticState.current = { left: false, right: false, up: false };
   }, [currentQuestionId, resetCard]);
 
-  const resolveGenderLabel = useCallback(
-    (role: 'A' | 'B') => {
-      const gender = role === 'A' ? partnerA.gender : partnerB.gender;
-      if (gender === 'MALE') return t('genderLabel.male');
-      if (gender === 'FEMALE') return t('genderLabel.female');
-      return t('genderLabel.neutral');
-    },
-    [partnerA.gender, partnerB.gender, t]
-  );
-
-  const activeLabel = resolveGenderLabel(activeSpeakerRole);
-  const nextLabel = resolveGenderLabel(activeSpeakerRole === 'A' ? 'B' : 'A');
+  const activeLabel = activeSpeakerRole === 'A' ? t('roles.partnerA') : t('roles.partnerB');
+  const nextLabel = activeSpeakerRole === 'A' ? t('roles.partnerB') : t('roles.partnerA');
 
   if (!currentQuestion) {
     return (

@@ -18,7 +18,6 @@ import { usePrefsStore } from '../state/prefsStore';
 import { FavoriteLikedBy, useFavoritesStore, useFavoriteMeta, useIsFavorite } from '../state/favoritesStore';
 import { useSessionStore } from '../state/sessionStore';
 import { RootStackParamList } from '../types';
-import { getActiveSpeakerGender } from '../utils/getActiveSpeakerGender';
 import { formatCountdown } from '../utils/time';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
@@ -54,7 +53,7 @@ export const GameScreen = ({ navigation }: Props) => {
 
   const activeTheme = getActiveThemeTokens();
 
-  const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
+  const ensureFavorite = useFavoritesStore((s) => s.ensureFavorite);
 
   const normalizedDeck = useMemo(() => {
     if (!mood || !relationshipStage) return [];
@@ -159,41 +158,61 @@ export const GameScreen = ({ navigation }: Props) => {
     [translate, resetCard]
   );
 
+  const actionLock = useRef(false);
+
+  const isPartnerATurn = questionsShown.length % 2 === 0;
+  const actorGender: FavoriteLikedBy = isPartnerATurn
+    ? partnerA.gender === 'MALE'
+      ? 'male'
+      : partnerA.gender === 'FEMALE'
+        ? 'female'
+        : 'neutral'
+    : partnerB.gender === 'MALE'
+      ? 'male'
+      : partnerB.gender === 'FEMALE'
+        ? 'female'
+        : 'neutral';
+
   const onSwipeLeftNext = useCallback(() => {
-    animateOffAndThen(-width * 1.1, 0, () => nextCard());
+    if (actionLock.current) return;
+    actionLock.current = true;
+    animateOffAndThen(-width * 1.1, 0, () => {
+      nextCard();
+      actionLock.current = false;
+    });
   }, [animateOffAndThen, nextCard, width]);
 
-  const toggleCurrentQuestionFavorite = useCallback((questionId: string, alreadyFavorite: boolean) => {
-    if (__DEV__) {
-      console.log('[fav] toggle', { id: questionId, language, alreadyFavorite });
-    }
-
-    if (!questionId) {
-      if (__DEV__) {
-        console.warn('[fav] toggle skipped: missing question id');
-      }
-      return;
-    }
-
-    if (!alreadyFavorite) {
-      const likedBy: FavoriteLikedBy = getActiveSpeakerGender(activeSpeakerRole, partnerA, partnerB);
-      registerFavoriteAdded();
-      toggleFavorite(questionId, likedBy);
-      return;
-    }
-
-    toggleFavorite(questionId);
-  }, [activeSpeakerRole, language, partnerA, partnerB, registerFavoriteAdded, toggleFavorite]);
-
-  const onSwipeRightFavNext = useCallback(() => {
+  const onLikeAndNext = useCallback(() => {
     if (!currentQuestion) return;
+    if (actionLock.current) return;
 
-    toggleCurrentQuestionFavorite(currentQuestion.id, Boolean(favoriteMeta));
-    animateOffAndThen(width * 1.1, 0, () => nextCard());
-  }, [animateOffAndThen, currentQuestion, favoriteMeta, nextCard, toggleCurrentQuestionFavorite, width]);
+    actionLock.current = true;
+
+    const existsBefore = Boolean(favoriteMeta);
+
+    if (__DEV__) {
+      console.log('[fav] ensure', { id: currentQuestion.id, language, existsBefore, likedBy: actorGender });
+    }
+
+    ensureFavorite(currentQuestion.id, actorGender);
+
+    if (!existsBefore) {
+      registerFavoriteAdded();
+    }
+
+    animateOffAndThen(width * 1.1, 0, () => {
+      nextCard();
+      actionLock.current = false;
+    });
+  }, [actorGender, animateOffAndThen, currentQuestion, ensureFavorite, favoriteMeta, language, nextCard, registerFavoriteAdded, width]);
 
   const onSwipeUpSkip = useCallback(() => {
-    animateOffAndThen(0, -height * 0.6, () => skipCard());
+    if (actionLock.current) return;
+    actionLock.current = true;
+    animateOffAndThen(0, -height * 0.6, () => {
+      skipCard();
+      actionLock.current = false;
+    });
   }, [animateOffAndThen, skipCard, height]);
 
   const hapticState = useRef({ left: false, right: false, up: false });
@@ -244,7 +263,7 @@ export const GameScreen = ({ navigation }: Props) => {
         }
 
         if (dx > H_THRESHOLD) {
-          onSwipeRightFavNext();
+          onLikeAndNext();
           return;
         }
 
@@ -269,6 +288,7 @@ export const GameScreen = ({ navigation }: Props) => {
 
   useEffect(() => {
     resetCard();
+    actionLock.current = false;
     hapticState.current = { left: false, right: false, up: false };
   }, [currentQuestionId, resetCard]);
 
@@ -354,7 +374,7 @@ export const GameScreen = ({ navigation }: Props) => {
             if (__DEV__) {
               console.log('[fav] press', { id: currentQuestion?.id, lang: language });
             }
-            toggleCurrentQuestionFavorite(currentQuestion.id, Boolean(favoriteMeta));
+            onLikeAndNext();
           }}
         >
           <Text style={[styles.sessionHeartText, { color: activeTheme.heart }]}>{favorite ? '♥' : '♡'}</Text>

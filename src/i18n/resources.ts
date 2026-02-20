@@ -29,6 +29,11 @@ export const resources = {
         female: 'Female',
         neutral: 'Neutral'
       },
+      genderLabel: {
+        male: 'Male',
+        female: 'Female',
+        neutral: 'Neutral'
+      },
       mood: {
         FUN: 'Fun',
         DEEP: 'Deep',
@@ -36,8 +41,7 @@ export const resources = {
       },
       minutes: '{{count}} min',
       game: {
-        partnerAFirst: 'Partner A first',
-        partnerBFirst: 'Partner B first',
+        speakerLabel: 'Speaker',
         next: 'Next',
         like: 'Like',
         skip: 'Skip',
@@ -120,7 +124,12 @@ export const resources = {
         partnerB: 'Partner B'
       },
       gender: {
-        male: 'Άντρας',
+        male: 'Άνδρας',
+        female: 'Γυναίκα',
+        neutral: 'Ουδέτερο'
+      },
+      genderLabel: {
+        male: 'Άνδρας',
         female: 'Γυναίκα',
         neutral: 'Ουδέτερο'
       },
@@ -131,8 +140,7 @@ export const resources = {
       },
       minutes: '{{count}} λεπτά',
       game: {
-        partnerAFirst: 'Ξεκινά ο/η Partner A',
-        partnerBFirst: 'Ξεκινά ο/η Partner B',
+        speakerLabel: 'Ομιλητής',
         next: 'Επόμενη',
         like: 'Μου αρέσει',
         skip: 'Παράλειψη',

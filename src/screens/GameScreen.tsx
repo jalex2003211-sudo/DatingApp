@@ -55,9 +55,23 @@ export const GameScreen = ({ navigation }: Props) => {
 
   const activeTheme = useMemo(() => {
     if (!profile) return { accent: "#A78BFA", heart: "#A78BFA", chipBg: "rgba(167,139,250,0.14)", borderGlow: "rgba(167,139,250,0.30)" };
-    const activePartner = activeSpeakerRole === "A" ? profile.partnerA : profile.partnerB;
+    const activePartner = activeSpeakerRole === 'A' ? profile.partnerA : profile.partnerB;
     return buildAccentTokens(getAccentForPartner(activePartner));
   }, [activeSpeakerRole, profile]);
+
+  const getCurrentPlayerLabel = useCallback(
+    (shownCount: number) => {
+      const fallbackA = 'Partner A';
+      const fallbackB = 'Partner B';
+
+      if (shownCount % 2 === 0) {
+        return profile?.partnerA.name?.trim() || fallbackA;
+      }
+
+      return profile?.partnerB.name?.trim() || fallbackB;
+    },
+    [profile]
+  );
 
   const ensureFavorite = useFavoritesStore((s) => s.ensureFavorite);
 
@@ -321,8 +335,8 @@ export const GameScreen = ({ navigation }: Props) => {
     hapticState.current = { left: false, right: false, up: false };
   }, [currentQuestionId, resetCard]);
 
-  const activeLabel = activeSpeakerRole === 'A' ? t('roles.partnerA') : t('roles.partnerB');
-  const nextLabel = activeSpeakerRole === 'A' ? t('roles.partnerB') : t('roles.partnerA');
+  const activeLabel = getCurrentPlayerLabel(questionsShown.length);
+  const nextLabel = getCurrentPlayerLabel(questionsShown.length + 1);
 
   if (!currentQuestion) {
     return (

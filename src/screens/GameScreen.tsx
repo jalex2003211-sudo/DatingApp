@@ -1,7 +1,15 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { PanGestureHandler, State } from 'react-native-gesture-handler';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import {
+  Animated,
+  PanResponder,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 import { QuestionCard } from '../components/QuestionCard';
 import { decksByMood } from '../data/decks';
@@ -15,6 +23,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
 
 export const GameScreen = ({ navigation }: Props) => {
   const { t } = useTranslation();
+  const { width, height } = useWindowDimensions();
+
   const language = usePrefsStore((s) => s.language);
   const {
     mood,
@@ -28,8 +38,9 @@ export const GameScreen = ({ navigation }: Props) => {
     tick,
     togglePause,
     endSession,
-    registerFavoriteAdded
+    registerFavoriteAdded,
   } = useSessionStore();
+
   const isFavorite = useFavoritesStore((s) => s.isFavorite);
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
 
@@ -37,6 +48,13 @@ export const GameScreen = ({ navigation }: Props) => {
     if (!mood || shuffledIds.length === 0) return null;
     const id = shuffledIds[currentIndex];
     return decksByMood[mood].find((q) => q.id === id) ?? null;
+  }, [mood, shuffledIds, currentIndex]);
+
+  const nextQuestion = useMemo(() => {
+    if (!mood || shuffledIds.length === 0) return null;
+    const nextIdx = Math.min(currentIndex + 1, shuffledIds.length - 1);
+    const nextId = shuffledIds[nextIdx];
+    return decksByMood[mood].find((q) => q.id === nextId) ?? null;
   }, [mood, shuffledIds, currentIndex]);
 
   useEffect(() => {
@@ -51,7 +69,174 @@ export const GameScreen = ({ navigation }: Props) => {
     }
   }, [timerSecondsLeft, navigation, endSession]);
 
-  const handleNext = useCallback(() => nextCard(), [nextCard]);
+  const favorite = currentQuestion ? isFavorite(currentQuestion.id) : false;
+
+  // ---- Swipe animation (RN core) ----
+  const translate = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+
+  const H_THRESHOLD = Math.max(90, width * 0.22);
+  const UP_THRESHOLD = 90;
+
+  // overlays
+  const likeOpacity = translate.x.interpolate({
+    inputRange: [0, H_THRESHOLD * 0.6, H_THRESHOLD],
+    outputRange: [0, 0.25, 1],
+    extrapolate: 'clamp',
+  });
+  const nextOpacity = translate.x.interpolate({
+    inputRange: [-H_THRESHOLD, -H_THRESHOLD * 0.6, 0],
+    outputRange: [1, 0.25, 0],
+    extrapolate: 'clamp',
+  });
+  const skipOpacity = translate.y.interpolate({
+    inputRange: [-UP_THRESHOLD, -UP_THRESHOLD * 0.6, 0],
+    outputRange: [1, 0.25, 0],
+    extrapolate: 'clamp',
+  });
+
+  // deck effect for next card
+  const backScale = translate.x.interpolate({
+    inputRange: [-width * 0.4, 0, width * 0.4],
+    outputRange: [0.97, 0.95, 0.97],
+    extrapolate: 'clamp',
+  });
+  const backTranslateY = translate.y.interpolate({
+    inputRange: [-height * 0.3, 0, height * 0.3],
+    outputRange: [6, 12, 18],
+    extrapolate: 'clamp',
+  });
+  const backOpacity = translate.x.interpolate({
+    inputRange: [-width * 0.6, 0, width * 0.6],
+    outputRange: [1, 0.95, 1],
+    extrapolate: 'clamp',
+  });
+
+  const rotate = translate.x.interpolate({
+    inputRange: [-width * 0.6, 0, width * 0.6],
+    outputRange: ['-10deg', '0deg', '10deg'],
+    extrapolate: 'clamp',
+  });
+
+  const resetCard = useCallback(() => {
+    translate.setValue({ x: 0, y: 0 });
+  }, [translate]);
+
+  const animateOffAndThen = useCallback(
+    (toX: number, toY: number, after: () => void) => {
+      Animated.timing(translate, {
+        toValue: { x: toX, y: toY },
+        duration: 180,
+        useNativeDriver: true,
+      }).start(() => {
+        resetCard();
+        after();
+      });
+    },
+    [translate, resetCard]
+  );
+
+  const onSwipeLeftNext = useCallback(() => {
+    animateOffAndThen(-width * 1.1, 0, () => nextCard());
+  }, [animateOffAndThen, nextCard, width]);
+
+  const onSwipeRightFavNext = useCallback(() => {
+    if (!currentQuestion) return;
+
+    if (!favorite) registerFavoriteAdded();
+    if (!favorite) toggleFavorite(currentQuestion.id);
+
+    animateOffAndThen(width * 1.1, 0, () => nextCard());
+  }, [animateOffAndThen, currentQuestion, favorite, nextCard, registerFavoriteAdded, toggleFavorite, width]);
+
+  const onSwipeUpSkip = useCallback(() => {
+    animateOffAndThen(0, -height * 0.6, () => skipCard());
+  }, [animateOffAndThen, skipCard, height]);
+
+  // ---- Haptics (trigger once when crossing threshold) ----
+  const hapticState = useRef({ left: false, right: false, up: false });
+
+  const maybeHaptic = useCallback(async (dx: number, dy: number) => {
+    const up = dy < -UP_THRESHOLD && Math.abs(dx) < H_THRESHOLD;
+    const left = dx < -H_THRESHOLD;
+    const right = dx > H_THRESHOLD;
+
+    // reset flags when back inside safe zone
+    if (!left) hapticState.current.left = false;
+    if (!right) hapticState.current.right = false;
+    if (!up) hapticState.current.up = false;
+
+    // trigger only once per direction
+    if (left && !hapticState.current.left) {
+      hapticState.current.left = true;
+      await Haptics.selectionAsync();
+    } else if (right && !hapticState.current.right) {
+      hapticState.current.right = true;
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else if (up && !hapticState.current.up) {
+      hapticState.current.up = true;
+      await Haptics.selectionAsync();
+    }
+  }, [H_THRESHOLD, UP_THRESHOLD]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: async (_, gesture) => {
+        translate.setValue({ x: gesture.dx, y: gesture.dy });
+        // best-effort haptics (don’t block UI)
+        void maybeHaptic(gesture.dx, gesture.dy);
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const dx = gesture.dx;
+        const dy = gesture.dy;
+
+        // Up: Skip (only if clearly up)
+        if (dy < -UP_THRESHOLD && Math.abs(dx) < H_THRESHOLD) {
+          onSwipeUpSkip();
+          return;
+        }
+
+        // Left: Next
+        if (dx < -H_THRESHOLD) {
+          onSwipeLeftNext();
+          return;
+        }
+
+        // Right: Favorite + Next
+        if (dx > H_THRESHOLD) {
+          onSwipeRightFavNext();
+          return;
+        }
+
+        // Not enough → snap back
+        Animated.spring(translate, {
+          toValue: { x: 0, y: 0 },
+          useNativeDriver: true,
+          friction: 7,
+          tension: 80,
+        }).start();
+      },
+    })
+  ).current;
+
+  const cardAnimatedStyle = {
+    transform: [
+      { translateX: translate.x },
+      { translateY: translate.y },
+      { rotate },
+    ],
+  } as const;
+
+  const backCardStyle = {
+    opacity: backOpacity,
+    transform: [{ translateY: backTranslateY }, { scale: backScale }],
+  } as const;
+
+  // reset when card changes
+  useEffect(() => {
+    resetCard();
+    hapticState.current = { left: false, right: false, up: false };
+  }, [currentIndex, resetCard]);
 
   if (!currentQuestion) {
     return (
@@ -61,12 +246,11 @@ export const GameScreen = ({ navigation }: Props) => {
     );
   }
 
-  const favorite = isFavorite(currentQuestion.id);
-
   return (
     <View style={styles.container}>
       <View style={styles.topRow}>
         <Text style={styles.timer}>{formatCountdown(timerSecondsLeft)}</Text>
+
         <Pressable
           style={styles.heart}
           onPress={() => {
@@ -78,36 +262,60 @@ export const GameScreen = ({ navigation }: Props) => {
         </Pressable>
       </View>
 
-      <PanGestureHandler
-        onHandlerStateChange={(e) => {
-          if (e.nativeEvent.state === State.END && e.nativeEvent.translationX < -45) {
-            handleNext();
-          }
-        }}
-      >
-        <View>
+      <View style={styles.cardArea}>
+        {/* Back card (deck) */}
+        {nextQuestion ? (
+          <Animated.View style={[styles.backCardWrap, backCardStyle]} pointerEvents="none">
+            <QuestionCard
+              label={(currentIndex + 1) % 2 === 0 ? t('game.youFirst') : t('game.partnerFirst')}
+              question={nextQuestion.text[language]}
+            />
+          </Animated.View>
+        ) : null}
+
+        {/* Front card (draggable) */}
+        <Animated.View style={[styles.frontCardWrap, cardAnimatedStyle]} {...panResponder.panHandlers}>
+          {/* Overlays */}
+          <Animated.View style={[styles.badge, styles.badgeLeft, { opacity: nextOpacity }]}>
+            <Text style={styles.badgeText}>NEXT</Text>
+          </Animated.View>
+
+          <Animated.View style={[styles.badge, styles.badgeRight, { opacity: likeOpacity }]}>
+            <Text style={styles.badgeText}>LIKE</Text>
+          </Animated.View>
+
+          <Animated.View style={[styles.badge, styles.badgeTop, { opacity: skipOpacity }]}>
+            <Text style={styles.badgeText}>SKIP</Text>
+          </Animated.View>
+
           <QuestionCard
             label={currentIndex % 2 === 0 ? t('game.youFirst') : t('game.partnerFirst')}
             question={currentQuestion.text[language]}
           />
-        </View>
-      </PanGestureHandler>
+        </Animated.View>
+      </View>
 
-      <Text style={styles.hint}>{t('game.swipeHint')}</Text>
+      <Text style={styles.hint}>
+        ← {t('game.next')} • → {t('favorites.title') ?? 'Favorite'} • ↑ {t('game.skip')}
+      </Text>
 
       <View style={styles.actions}>
-        <Pressable style={styles.actionButton} onPress={handleNext}>
+        <Pressable style={styles.actionButton} onPress={onSwipeLeftNext}>
           <Text style={styles.actionText}>{t('game.next')}</Text>
         </Pressable>
-        <Pressable style={styles.actionButton} onPress={skipCard}>
+
+        <Pressable style={styles.actionButton} onPress={onSwipeUpSkip}>
           <Text style={styles.actionText}>{t('game.skip')}</Text>
         </Pressable>
+
         <Pressable style={styles.actionButton} onPress={togglePause}>
           <Text style={styles.actionText}>{paused ? t('game.resume') : t('game.pause')}</Text>
         </Pressable>
       </View>
 
-      <Text style={styles.stats}>{`${t('end.viewed')}: ${stats.viewed} • ${t('end.skipped')}: ${stats.skipped}`}</Text>
+      <Text style={styles.stats}>
+        {`${t('end.viewed')}: ${stats.viewed} • ${t('end.skipped')}: ${stats.skipped}`}
+      </Text>
     </View>
   );
 };
@@ -115,13 +323,43 @@ export const GameScreen = ({ navigation }: Props) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#111827', padding: 20, justifyContent: 'space-between' },
   title: { color: '#FFF' },
+
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   timer: { color: '#A5B4FC', fontSize: 28, fontWeight: '700' },
   heart: { padding: 10, backgroundColor: '#1F2937', borderRadius: 20 },
   heartText: { color: '#F472B6', fontSize: 24 },
+
+  cardArea: { flex: 1, justifyContent: 'center' },
+
+  backCardWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+  },
+  frontCardWrap: {
+    // sits above back card
+  },
+
+  badge: {
+    position: 'absolute',
+    zIndex: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(17,24,39,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  badgeText: { color: '#F9FAFB', fontWeight: '800', letterSpacing: 1 },
+  badgeLeft: { top: 16, left: 16 },
+  badgeRight: { top: 16, right: 16 },
+  badgeTop: { top: 16, alignSelf: 'center' },
+
   hint: { color: '#9CA3AF', textAlign: 'center', marginTop: 10 },
-  actions: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
+
+  actions: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginTop: 10 },
   actionButton: { flex: 1, backgroundColor: '#374151', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   actionText: { color: '#F9FAFB', fontWeight: '600' },
-  stats: { color: '#D1D5DB', textAlign: 'center', marginBottom: 8 }
+
+  stats: { color: '#D1D5DB', textAlign: 'center', marginBottom: 8 },
 });

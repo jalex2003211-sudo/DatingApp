@@ -14,10 +14,13 @@ export type FavoriteEntry = {
 type LegacyFavoriteState = {
   favoriteIds?: unknown;
   favorites?: unknown;
+  favoritesById?: unknown;
 };
 
+export type FavoritesById = Record<string, FavoriteEntry>;
+
 type FavoritesState = {
-  favorites: FavoriteEntry[];
+  favoritesById: FavoritesById;
   toggleFavorite: (questionId: string, likedBy?: FavoriteLikedBy) => void;
   removeFavorite: (questionId: string) => void;
   isFavorite: (questionId: string) => boolean;
@@ -26,7 +29,7 @@ type FavoritesState = {
   clearFavorites: () => void;
 };
 
-const FAVORITES_STORAGE_VERSION = 2;
+const FAVORITES_STORAGE_VERSION = 3;
 
 const questionTextToIdMap = new Map<string, string>(
   getAllNormalizedQuestions().flatMap((question) => [
@@ -111,10 +114,19 @@ const normalizeEntries = (rawValues: unknown): FavoriteEntry[] => {
   return Array.from(unique.values()).sort((a, b) => b.createdAt - a.createdAt);
 };
 
+const toFavoritesById = (entries: FavoriteEntry[]): FavoritesById =>
+  entries.reduce<FavoritesById>((acc, entry) => {
+    acc[entry.id] = entry;
+    return acc;
+  }, {});
+
+const sortFavoriteEntries = (favoritesById: FavoritesById): FavoriteEntry[] =>
+  Object.values(favoritesById).sort((a, b) => b.createdAt - a.createdAt);
+
 export const useFavoritesStore = create<FavoritesState>()(
   persist(
     (set, get) => ({
-      favorites: [],
+      favoritesById: {},
       toggleFavorite: (questionId, likedBy = 'neutral') => {
         if (!questionId) {
           if (__DEV__) {
@@ -122,24 +134,41 @@ export const useFavoritesStore = create<FavoritesState>()(
           }
           return;
         }
-        const exists = get().favorites.some((favorite) => favorite.id === questionId);
+        const exists = Boolean(get().favoritesById[questionId]);
 
         if (__DEV__) {
           console.log('[fav] toggle', { id: questionId, existsBefore: exists, likedByFinal: likedBy ?? 'neutral' });
         }
 
-        set({
-          favorites: exists
-            ? get().favorites.filter((favorite) => favorite.id !== questionId)
-            : [{ id: questionId, likedBy, createdAt: Date.now() }, ...get().favorites]
+        set((state) => {
+          const nextFavoritesById = { ...state.favoritesById };
+
+          if (nextFavoritesById[questionId]) {
+            delete nextFavoritesById[questionId];
+          } else {
+            nextFavoritesById[questionId] = {
+              id: questionId,
+              likedBy: likedBy ?? 'neutral',
+              createdAt: Date.now()
+            };
+          }
+
+          return { favoritesById: nextFavoritesById };
         });
+
+        console.log('[fav] count', Object.keys(get().favoritesById).length);
       },
       removeFavorite: (questionId) =>
-        set({ favorites: get().favorites.filter((favorite) => favorite.id !== questionId) }),
-      isFavorite: (questionId) => get().favorites.some((favorite) => favorite.id === questionId),
-      getFavoriteEntry: (questionId) => get().favorites.find((favorite) => favorite.id === questionId) ?? null,
-      listFavorites: () => [...get().favorites].sort((a, b) => b.createdAt - a.createdAt),
-      clearFavorites: () => set({ favorites: [] })
+        set((state) => {
+          if (!state.favoritesById[questionId]) return state;
+          const nextFavoritesById = { ...state.favoritesById };
+          delete nextFavoritesById[questionId];
+          return { favoritesById: nextFavoritesById };
+        }),
+      isFavorite: (questionId) => Boolean(get().favoritesById[questionId]),
+      getFavoriteEntry: (questionId) => get().favoritesById[questionId] ?? null,
+      listFavorites: () => sortFavoriteEntries(get().favoritesById),
+      clearFavorites: () => set({ favoritesById: {} })
     }),
     {
       name: 'between-us-favorites',
@@ -147,7 +176,7 @@ export const useFavoritesStore = create<FavoritesState>()(
       storage: createJSONStorage(() => AsyncStorage),
       migrate: (persistedState) => {
         const state = (persistedState ?? {}) as LegacyFavoriteState;
-        const rawFavorites = state.favorites ?? state.favoriteIds;
+        const rawFavorites = state.favoritesById ?? state.favorites ?? state.favoriteIds;
 
         const migratedFavorites = normalizeEntries(rawFavorites);
 
@@ -156,7 +185,7 @@ export const useFavoritesStore = create<FavoritesState>()(
         }
 
         return {
-          favorites: migratedFavorites
+          favoritesById: toFavoritesById(migratedFavorites)
         };
       },
       onRehydrateStorage: () => (state, error) => {
@@ -170,16 +199,22 @@ export const useFavoritesStore = create<FavoritesState>()(
 
         if (!state) return;
 
-        if (!Array.isArray(state.favorites)) {
+        if (!state.favoritesById || typeof state.favoritesById !== 'object') {
           if (__DEV__) {
-            console.warn('[fav] invalid favorites state after rehydrate; resetting');
+            console.warn('[fav] invalid favoritesById state after rehydrate; resetting');
           }
           state.clearFavorites();
           return;
         }
 
-        state.favorites = normalizeEntries(state.favorites);
+        state.favoritesById = toFavoritesById(normalizeEntries(state.favoritesById));
       }
     }
   )
 );
+
+export const useIsFavorite = (id?: string | null) =>
+  useFavoritesStore((s) => (id ? Boolean(s.favoritesById[id]) : false));
+
+export const useFavoriteMeta = (id?: string | null) =>
+  useFavoritesStore((s) => (id ? s.favoritesById[id] ?? null : null));

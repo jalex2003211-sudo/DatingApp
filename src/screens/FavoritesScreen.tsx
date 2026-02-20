@@ -28,7 +28,7 @@ const moodChipColor: Record<Question['mood'], string> = {
 export const FavoritesScreen = ({ navigation }: Props) => {
   const { t } = useTranslation();
   const lang = usePrefsStore((s) => s.language);
-  const listFavorites = useFavoritesStore((s) => s.listFavorites);
+  const favorites = useFavoritesStore((s) => Object.values(s.favoritesById).sort((a, b) => b.createdAt - a.createdAt));
   const removeFavorite = useFavoritesStore((s) => s.removeFavorite);
   const startFavoritesSession = useSessionStore((s) => s.startFavoritesSession);
 
@@ -40,7 +40,6 @@ export const FavoritesScreen = ({ navigation }: Props) => {
     return map;
   }, []);
 
-  const favorites = listFavorites();
 
   const filteredEntries = useMemo(() => {
     if (filter === 'all') return favorites;

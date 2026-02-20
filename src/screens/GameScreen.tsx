@@ -13,6 +13,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 import { QuestionCard } from '../components/QuestionCard';
+import { ProfileAvatar } from '../components/ProfileAvatar';
 import { getAllNormalizedQuestions, getSessionQuestionsForMood } from '../engine/normalizeQuestions';
 import { usePrefsStore } from '../state/prefsStore';
 import { FavoriteLikedBy, useFavoritesStore, useFavoriteMeta, useIsFavorite } from '../state/favoritesStore';
@@ -42,13 +43,16 @@ export const GameScreen = ({ navigation }: Props) => {
     timerSecondsLeft,
     stats,
     activeSpeakerRole,
+    partnerAScore,
+    partnerBScore,
     completed,
     endReason,
     nextCard,
     skipCard,
     tick,
     endSession,
-    registerFavoriteAdded
+    registerFavoriteAdded,
+    incrementScoreForTurn
   } = useSessionStore();
 
   const profile = useProfileStore((s) => s.profile);
@@ -193,10 +197,11 @@ export const GameScreen = ({ navigation }: Props) => {
     if (actionLock.current) return;
     actionLock.current = true;
     animateOffAndThen(-width * 1.1, 0, () => {
+      incrementScoreForTurn();
       nextCard();
       actionLock.current = false;
     });
-  }, [animateOffAndThen, nextCard, width]);
+  }, [animateOffAndThen, incrementScoreForTurn, nextCard, width]);
 
   const onLikeAndNext = useCallback(() => {
     if (!currentQuestion) return;
@@ -217,10 +222,11 @@ export const GameScreen = ({ navigation }: Props) => {
     }
 
     animateOffAndThen(width * 1.1, 0, () => {
+      incrementScoreForTurn();
       nextCard();
       actionLock.current = false;
     });
-  }, [actorGender, animateOffAndThen, currentQuestion, ensureFavorite, favoriteMeta, language, nextCard, registerFavoriteAdded, width]);
+  }, [actorGender, animateOffAndThen, currentQuestion, ensureFavorite, favoriteMeta, language, nextCard, registerFavoriteAdded, width, incrementScoreForTurn]);
 
   const onSwipeUpSkip = useCallback(() => {
     if (actionLock.current) return;
@@ -338,6 +344,9 @@ export const GameScreen = ({ navigation }: Props) => {
   const activeLabel = getCurrentPlayerLabel(questionsShown.length);
   const nextLabel = getCurrentPlayerLabel(questionsShown.length + 1);
 
+  const partnerAAccent = buildAccentTokens(getAccentForPartner(profile?.partnerA ?? { id: 'A', name: 'Partner A', gender: 'custom' })).accent;
+  const partnerBAccent = buildAccentTokens(getAccentForPartner(profile?.partnerB ?? { id: 'B', name: 'Partner B', gender: 'custom' })).accent;
+
   if (!currentQuestion) {
     return (
       <View style={styles.container}>
@@ -348,6 +357,30 @@ export const GameScreen = ({ navigation }: Props) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.topScoreBar}>
+        <View style={styles.scoreChip}>
+          <ProfileAvatar
+            name={profile?.partnerA.name ?? 'Partner A'}
+            photoUri={profile?.partnerA.photoUri}
+            accentColor={partnerAAccent}
+          />
+          <View style={styles.scorePill}>
+            <Text style={styles.scoreText}>{partnerAScore}</Text>
+          </View>
+        </View>
+
+        <View style={styles.scoreChip}>
+          <ProfileAvatar
+            name={profile?.partnerB.name ?? 'Partner B'}
+            photoUri={profile?.partnerB.photoUri}
+            accentColor={partnerBAccent}
+          />
+          <View style={styles.scorePill}>
+            <Text style={styles.scoreText}>{partnerBScore}</Text>
+          </View>
+        </View>
+      </View>
+
       <View style={styles.cardArea}>
         {nextQuestion ? (
           <Animated.View style={[styles.backCardWrap, backCardStyle]} pointerEvents="none">
@@ -420,6 +453,38 @@ export const GameScreen = ({ navigation }: Props) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#111827', paddingHorizontal: 20 },
   title: { color: '#FFF' },
+  topScoreBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 6,
+    marginBottom: 10
+  },
+  scoreChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(20,24,34,0.66)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 8
+  },
+  scorePill: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 7
+  },
+  scoreText: {
+    color: '#F9FAFB',
+    fontSize: 12,
+    fontWeight: '700'
+  },
   cardArea: { flex: 1, justifyContent: 'center', paddingBottom: 96 },
   backCardWrap: { position: 'absolute', left: 0, right: 0 },
   frontCardWrap: { overflow: 'visible', zIndex: 10 },

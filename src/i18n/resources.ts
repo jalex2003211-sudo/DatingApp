@@ -30,8 +30,7 @@ export const resources = {
         skipped: 'Cards skipped',
         favorites: 'Favorites added',
         playAgain: 'Play again',
-        home: 'Home',
-        favorites: 'Favorites'
+        home: 'Home'
       },
       favoritesTitle: 'Favorites',
       noFavorites: 'No favorites yet.',
@@ -74,8 +73,7 @@ export const resources = {
         skipped: 'Κάρτες που προσπεράσατε',
         favorites: 'Αγαπημένες που προστέθηκαν',
         playAgain: 'Παίξτε ξανά',
-        home: 'Αρχική',
-        favorites: 'Αγαπημένες'
+        home: 'Αρχική'
       },
       favoritesTitle: 'Αγαπημένες',
       noFavorites: 'Δεν υπάρχουν αγαπημένες ακόμη.',

@@ -12,7 +12,8 @@ import {
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 import { QuestionCard } from '../components/QuestionCard';
-import { decksByMood } from '../data/decks';
+import { getNormalizedQuestionsForMood } from '../engine/normalizeQuestions';
+import { SessionEngine } from '../engine/sessionEngine';
 import { useFavoritesStore } from '../state/favoritesStore';
 import { usePrefsStore } from '../state/prefsStore';
 import { useSessionStore } from '../state/sessionStore';
@@ -28,8 +29,12 @@ export const GameScreen = ({ navigation }: Props) => {
   const language = usePrefsStore((s) => s.language);
   const {
     mood,
-    currentIndex,
-    shuffledIds,
+    currentQuestionId,
+    questionsShown,
+    currentPhase,
+    targetIntensity,
+    relationshipStage,
+    isPremium,
     timerSecondsLeft,
     paused,
     stats,
@@ -44,18 +49,27 @@ export const GameScreen = ({ navigation }: Props) => {
   const isFavorite = useFavoritesStore((s) => s.isFavorite);
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
 
+  const normalizedDeck = useMemo(
+    () => (mood ? getNormalizedQuestionsForMood(mood) : []),
+    [mood]
+  );
+
   const currentQuestion = useMemo(() => {
-    if (!mood || shuffledIds.length === 0) return null;
-    const id = shuffledIds[currentIndex];
-    return decksByMood[mood].find((q) => q.id === id) ?? null;
-  }, [mood, shuffledIds, currentIndex]);
+    if (!currentQuestionId) return null;
+    return normalizedDeck.find((q) => q.id === currentQuestionId) ?? null;
+  }, [currentQuestionId, normalizedDeck]);
 
   const nextQuestion = useMemo(() => {
-    if (!mood || shuffledIds.length === 0) return null;
-    const nextIdx = Math.min(currentIndex + 1, shuffledIds.length - 1);
-    const nextId = shuffledIds[nextIdx];
-    return decksByMood[mood].find((q) => q.id === nextId) ?? null;
-  }, [mood, shuffledIds, currentIndex]);
+    if (!mood) return null;
+    const engine = new SessionEngine(normalizedDeck, { mood, relationshipStage, isPremium });
+    return (
+      engine.getNextQuestion({
+        currentPhase,
+        targetIntensity,
+        questionsShown,
+      }) ?? null
+    );
+  }, [currentPhase, isPremium, mood, normalizedDeck, questionsShown, relationshipStage, targetIntensity]);
 
   useEffect(() => {
     const interval = setInterval(() => tick(), 1000);
@@ -236,7 +250,7 @@ export const GameScreen = ({ navigation }: Props) => {
   useEffect(() => {
     resetCard();
     hapticState.current = { left: false, right: false, up: false };
-  }, [currentIndex, resetCard]);
+  }, [currentQuestionId, resetCard]);
 
   if (!currentQuestion) {
     return (
@@ -267,7 +281,7 @@ export const GameScreen = ({ navigation }: Props) => {
         {nextQuestion ? (
           <Animated.View style={[styles.backCardWrap, backCardStyle]} pointerEvents="none">
             <QuestionCard
-              label={(currentIndex + 1) % 2 === 0 ? t('game.youFirst') : t('game.partnerFirst')}
+              label={questionsShown.length % 2 === 0 ? t('game.youFirst') : t('game.partnerFirst')}
               question={nextQuestion.text[language]}
             />
           </Animated.View>
@@ -289,11 +303,20 @@ export const GameScreen = ({ navigation }: Props) => {
           </Animated.View>
 
           <QuestionCard
-            label={currentIndex % 2 === 0 ? t('game.youFirst') : t('game.partnerFirst')}
+            label={questionsShown.length % 2 === 1 ? t('game.youFirst') : t('game.partnerFirst')}
             question={currentQuestion.text[language]}
           />
         </Animated.View>
       </View>
+
+      {__DEV__ ? (
+        <View style={styles.devOverlay}>
+          <Text style={styles.devText}>phase: {currentPhase}</Text>
+          <Text style={styles.devText}>targetIntensity: {targetIntensity}</Text>
+          <Text style={styles.devText}>shown: {questionsShown.length}</Text>
+          <Text style={styles.devText}>timerSecondsLeft: {timerSecondsLeft}</Text>
+        </View>
+      ) : null}
 
       <Text style={styles.hint}>
         ← {t('game.next')} • → {t('favorites.title') ?? 'Favorite'} • ↑ {t('game.skip')}
@@ -362,4 +385,11 @@ const styles = StyleSheet.create({
   actionText: { color: '#F9FAFB', fontWeight: '600' },
 
   stats: { color: '#D1D5DB', textAlign: 'center', marginBottom: 8 },
+  devOverlay: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 8,
+    padding: 8,
+  },
+  devText: { color: '#93C5FD', fontSize: 12 },
 });

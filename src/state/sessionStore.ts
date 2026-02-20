@@ -1,6 +1,8 @@
 import { create } from 'zustand';
+import { EmotionalJourneySession, JourneySnapshot } from '../application/session/EmotionalJourneySession';
+import { DEFAULT_RELATIONSHIP_PROFILE } from '../domain/profile/RelationshipProfile';
+import { SessionSummary } from '../domain/session/types';
 import { getNormalizedQuestionsForMood } from '../engine/normalizeQuestions';
-import { SessionEngine } from '../engine/sessionEngine';
 import { Mood, RelationshipStage, StageType } from '../types';
 import { minutesToSeconds } from '../utils/time';
 
@@ -8,6 +10,9 @@ type SessionStats = {
   viewed: number;
   skipped: number;
   favoritesAdded: number;
+  averageIntensity: number;
+  peakPhase: StageType;
+  safetyLevel: number;
 };
 
 type SessionState = {
@@ -15,6 +20,7 @@ type SessionState = {
   duration: number;
   timerSecondsLeft: number;
   currentQuestionId: string | null;
+  nextQuestionId: string | null;
   questionsShown: string[];
   currentPhase: StageType;
   targetIntensity: number;
@@ -22,6 +28,7 @@ type SessionState = {
   isPremium: boolean;
   paused: boolean;
   completed: boolean;
+  summary: SessionSummary | null;
   stats: SessionStats;
   startSession: (mood: Mood, duration: number) => void;
   nextCard: () => void;
@@ -33,13 +40,21 @@ type SessionState = {
   resetSession: () => void;
 };
 
-const initialStats: SessionStats = { viewed: 0, skipped: 0, favoritesAdded: 0 };
+const initialStats: SessionStats = {
+  viewed: 0,
+  skipped: 0,
+  favoritesAdded: 0,
+  averageIntensity: 0,
+  peakPhase: 'warmup',
+  safetyLevel: 0.65
+};
 
 const initialState = {
   mood: null,
   duration: 10,
   timerSecondsLeft: minutesToSeconds(10),
   currentQuestionId: null,
+  nextQuestionId: null,
   questionsShown: [] as string[],
   currentPhase: 'warmup' as StageType,
   targetIntensity: 2,
@@ -47,103 +62,64 @@ const initialState = {
   isPremium: false,
   paused: false,
   completed: false,
+  summary: null,
   stats: initialStats
 };
 
-const STAGE_FLOW: Record<Mood, StageType[]> = {
-  FUN: ['warmup', 'curiosity', 'relief'],
-  DEEP: ['warmup', 'curiosity', 'deep', 'relief', 'vulnerable', 'relief'],
-  INTIMATE: ['warmup', 'curiosity', 'intimate', 'relief']
-};
+let activeJourneySession: EmotionalJourneySession | null = null;
 
-const getAdaptiveTargets = (
-  mood: Mood,
-  shownCount: number,
-  totalQuestions: number
-): { currentPhase: StageType; targetIntensity: number } => {
-  const phaseFlow = STAGE_FLOW[mood];
-  const progress = totalQuestions > 0 ? shownCount / totalQuestions : 0;
-  const phaseIndex = Math.min(phaseFlow.length - 1, Math.floor(progress * phaseFlow.length));
-
-  const intensityCap = mood === 'FUN' ? 2 : 4;
-  const targetIntensity = Math.max(
-    1,
-    Math.min(intensityCap, Math.round(1 + progress * (intensityCap - 1)))
-  );
-
-  return {
-    currentPhase: phaseFlow[phaseIndex],
-    targetIntensity
-  };
-};
+const patchFromSnapshot = (snapshot: JourneySnapshot) => ({
+  currentQuestionId: snapshot.currentQuestion?.id ?? null,
+  nextQuestionId: snapshot.upcomingQuestion?.id ?? null,
+  questionsShown: snapshot.memory.shownQuestionIds,
+  currentPhase: snapshot.emotionalState.phase,
+  targetIntensity: Number(snapshot.emotionalState.intensity.toFixed(2)),
+  stats: {
+    viewed: snapshot.memory.shownQuestionIds.length,
+    skipped: snapshot.memory.skipsCount,
+    favoritesAdded: snapshot.memory.favoritesAdded,
+    averageIntensity: Number(snapshot.memory.averageIntensityExperienced.toFixed(2)),
+    peakPhase: snapshot.memory.peakPhaseReached,
+    safetyLevel: Number(snapshot.emotionalState.safetyLevel.toFixed(2))
+  }
+});
 
 export const useSessionStore = create<SessionState>((set, get) => ({
   ...initialState,
   startSession: (mood, duration) => {
-    const normalized = getNormalizedQuestionsForMood(mood);
-    const engine = new SessionEngine(normalized, {
+    const questions = getNormalizedQuestionsForMood(mood);
+    activeJourneySession = new EmotionalJourneySession({
       mood,
-      relationshipStage: initialState.relationshipStage,
-      isPremium: initialState.isPremium
+      isPremium: get().isPremium,
+      relationshipStage: get().relationshipStage,
+      relationshipProfile: {
+        ...DEFAULT_RELATIONSHIP_PROFILE,
+        stage: get().relationshipStage
+      },
+      questions
     });
 
-    const initialTargets = getAdaptiveTargets(mood, 0, normalized.length);
-    const firstQuestion = engine.getNextQuestion({
-      ...initialTargets,
-      questionsShown: []
-    });
-
-    const shown = firstQuestion ? [firstQuestion.id] : [];
+    const snapshot = activeJourneySession.start();
 
     set({
       mood,
       duration,
       timerSecondsLeft: minutesToSeconds(duration),
-      currentQuestionId: firstQuestion?.id ?? null,
-      questionsShown: shown,
-      currentPhase: initialTargets.currentPhase,
-      targetIntensity: initialTargets.targetIntensity,
       paused: false,
       completed: false,
-      stats: { ...initialStats, viewed: shown.length > 0 ? 1 : 0 }
+      summary: null,
+      ...patchFromSnapshot(snapshot)
     });
   },
   nextCard: () => {
-    const state = get();
-    if (!state.mood) return;
-
-    const normalized = getNormalizedQuestionsForMood(state.mood);
-    const nextTargets = getAdaptiveTargets(state.mood, state.questionsShown.length, normalized.length);
-    const engine = new SessionEngine(normalized, {
-      mood: state.mood,
-      relationshipStage: state.relationshipStage,
-      isPremium: state.isPremium
-    });
-
-    const nextQuestion = engine.getNextQuestion({
-      currentPhase: nextTargets.currentPhase,
-      targetIntensity: nextTargets.targetIntensity,
-      questionsShown: state.questionsShown
-    });
-
-    if (!nextQuestion || nextQuestion.id === state.currentQuestionId) {
-      set({ currentPhase: nextTargets.currentPhase, targetIntensity: nextTargets.targetIntensity });
-      return;
-    }
-
-    set({
-      currentQuestionId: nextQuestion.id,
-      questionsShown: [...state.questionsShown, nextQuestion.id],
-      currentPhase: nextTargets.currentPhase,
-      targetIntensity: nextTargets.targetIntensity,
-      stats: { ...state.stats, viewed: state.stats.viewed + 1 }
-    });
+    if (!activeJourneySession) return;
+    const snapshot = activeJourneySession.next();
+    set({ ...patchFromSnapshot(snapshot) });
   },
   skipCard: () => {
-    get().nextCard();
-    set((state) => ({
-      stats: { ...state.stats, skipped: state.stats.skipped + 1 }
-    }));
+    if (!activeJourneySession) return;
+    const snapshot = activeJourneySession.skip();
+    set({ ...patchFromSnapshot(snapshot) });
   },
   tick: () => {
     const { paused, timerSecondsLeft } = get();
@@ -151,10 +127,29 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ timerSecondsLeft: timerSecondsLeft - 1 });
   },
   togglePause: () => set((state) => ({ paused: !state.paused })),
-  registerFavoriteAdded: () =>
+  registerFavoriteAdded: () => {
+    if (!activeJourneySession) return;
+    const snapshot = activeJourneySession.favorite();
+    set({ ...patchFromSnapshot(snapshot) });
+  },
+  endSession: () => {
+    const summary = activeJourneySession?.complete() ?? null;
     set((state) => ({
-      stats: { ...state.stats, favoritesAdded: state.stats.favoritesAdded + 1 }
-    })),
-  endSession: () => set({ completed: true, paused: true }),
-  resetSession: () => set(initialState)
+      completed: true,
+      paused: true,
+      summary,
+      stats: summary
+        ? {
+            ...state.stats,
+            averageIntensity: summary.averageIntensity,
+            peakPhase: summary.peakPhase,
+            safetyLevel: summary.safetyLevel
+          }
+        : state.stats
+    }));
+  },
+  resetSession: () => {
+    activeJourneySession = null;
+    set(initialState);
+  }
 }));
